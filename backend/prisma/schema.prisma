@@ -14,29 +14,101 @@ enum Role {
   ASSISTANT
 }
 
-model User {
+model Company {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
   name      String
-  role      Role     @default(DENTIST)
+  taxId     String   @unique // RUC/NIT
   active    Boolean  @default(true)
+  branches  Branch[]
+  users     User[]
+  patients  Patient[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model Branch {
+  id           Int           @id @default(autoincrement())
+  name         String
+  address      String?
+  phone        String?
+  companyId    Int
+  company      Company       @relation(fields: [companyId], references: [id])
+  users        User[]
+  appointments Appointment[]
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  password     String
+  name         String
+  role         Role          @default(DENTIST)
+  active       Boolean       @default(true)
+  companyId    Int
+  company      Company       @relation(fields: [companyId], references: [id])
+  branchId     Int?
+  branch       Branch?       @relation(fields: [branchId], references: [id])
+  appointments Appointment[] @relation("DoctorAppointments")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
 model Patient {
-  id               Int      @id @default(autoincrement())
+  id               Int           @id @default(autoincrement())
   firstName        String
-  lastName         String
-  documentId       String   @unique
+  lastName         String // We can keep this for compatibility or join paternal/maternal
+  paternalSurname  String?
+  maternalSurname  String?
+  documentType     String        @default("DNI")
+  documentId       String        @unique
+  nationality      String?       @default("Peruano")
   birthDate        DateTime
-  gender           String
-  phone            String?
+  gender           String        @default("SIN ESPECIFICAR")
+  civilStatus      String?       @default("SIN ESPECIFICAR")
+  phoneMobile      String?
+  phoneHome      String?
+  phone            String? // Keep for legacy compatibility
   email            String?
+  webUser          String?
+  webPassword      String?
+  whatsappEnabled  Boolean       @default(true)
+  ubigeoAddress    String?
+  ubigeoCode       String?
   address          String?
-  emergencyContact String?
-  medicalHistory   String? // JSON or text for basic history
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  reference        String?
+  medicalHistory   String?
+  active           Boolean       @default(true)
+  companyId        Int
+  company          Company       @relation(fields: [companyId], references: [id])
+  appointments     Appointment[]
+  odontograms      Odontogram[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model Appointment {
+  id         Int      @id @default(autoincrement())
+  date       DateTime
+  status     String   @default("SCHEDULED") // SCHEDULED, CONFIRMED, ATTENDED, CANCELLED
+  notes      String?
+  patientId  Int
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  doctorId   Int
+  doctor     User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  branchId   Int
+  branch     Branch   @relation(fields: [branchId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Odontogram {
+  id        Int      @id @default(autoincrement())
+  data      Json // Dynamic state of teeth
+  patientId Int
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

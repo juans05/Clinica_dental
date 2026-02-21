@@ -11,7 +11,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Dental System API is running' });
 });
 
-// Future routes will be added here
-// app.use('/api/v1', routes);
+// Routes
+const routes = require('./routes');
+app.use('/api', routes);
 
 module.exports = app;

@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Stethoscope, Lock, Mail, Loader2, Play } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    Stethoscope,
+    Lock,
+    Mail,
+    Loader2,
+    ShieldCheck,
+    ArrowRight,
+    Sparkles
+} from 'lucide-react';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -27,82 +36,121 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-sky-50">
-            <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row m-4">
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden font-sans">
+            {/* Animated Background Elements */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-200/20 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-200/20 rounded-full blur-[120px] animate-pulse delay-1000"></div>
 
-                {/* Left Side - Hero/Brand */}
-                <div className="w-full md:w-1/2 bg-gradient-to-br from-cyan-600 to-blue-700 p-12 text-white flex flex-col justify-between relative overflow-hidden">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="max-w-5xl w-full glass-card rounded-[32px] overflow-hidden flex flex-col md:flex-row m-4 h-full md:h-[650px] relative z-10 border border-white/40"
+            >
+                {/* Left Side: Brand & Visuals */}
+                <div className="w-full md:w-[45%] bg-slate-900 p-10 md:p-14 text-white flex flex-col justify-between relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-cyan-600/20 to-transparent"></div>
+
                     <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-8">
-                            <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                                <Stethoscope size={32} />
+                        <motion.div
+                            initial={{ x: -20, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            transition={{ delay: 0.3 }}
+                            className="flex items-center gap-3 mb-12"
+                        >
+                            <div className="h-12 w-12 bg-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/40">
+                                <Stethoscope size={28} />
                             </div>
-                            <h1 className="text-2xl font-bold tracking-wide">Dental SGD</h1>
+                            <div className="font-black text-2xl tracking-tight">
+                                SGD <span className="text-cyan-400 font-medium">Dental</span>
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ delay: 0.5 }}
+                        >
+                            <h2 className="text-4xl md:text-5xl font-black mb-6 leading-[1.1] tracking-tight">
+                                Gestión de <br /> <span className="text-cyan-400">Próxima Generación.</span>
+                            </h2>
+                            <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-[280px]">
+                                El estándar de oro para consultorios dentales modernos.
+                            </p>
+                        </motion.div>
+                    </div>
+
+                    <div className="relative z-10 space-y-4">
+                        <div className="flex items-center gap-3 text-slate-400 text-sm font-bold uppercase tracking-widest">
+                            <ShieldCheck className="text-emerald-500" size={18} />
+                            Seguridad de Grado Médico
                         </div>
-                        <h2 className="text-4xl font-bold mb-4 leading-tight">Software de Gestión Dental Profesional</h2>
-                        <p className="text-cyan-100 text-lg">Optimice su consultorio y mejore la experiencia de sus pacientes.</p>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                            © 2026 SGD Dental Suite. Todos los derechos reservados.
+                        </p>
                     </div>
 
-                    <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-                    <div className="absolute top-12 -right-12 w-32 h-32 bg-cyan-400/20 rounded-full blur-2xl"></div>
-
-                    <div className="relative z-10 mt-12 text-sm text-cyan-200">
-                        © 2026 Dental SGD System.
-                    </div>
+                    {/* Decorative Circles */}
+                    <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl"></div>
                 </div>
 
-                {/* Right Side - Login Form */}
-                <div className="w-full md:w-1/2 p-8 md:p-12">
-                    <div className="text-center mb-10">
-                        <h2 className="text-3xl font-bold text-gray-800 mb-2">Bienvenido</h2>
-                        <p className="text-gray-500">Ingrese sus credenciales para acceder</p>
-                        {/* Quick Fill for Demo */}
-                        <button
-                            onClick={() => { setEmail('admin@dental.com'); setPassword('admin123') }}
-                            className="mt-2 text-xs text-blue-500 hover:underline flex items-center justify-center w-full gap-1"
-                            title="Solo para desarrollo"
+                {/* Right Side: Form Section */}
+                <div className="w-full md:w-[55%] p-10 md:p-16 flex flex-col justify-center bg-white/40 backdrop-blur-sm">
+                    <div className="mb-10">
+                        <motion.span
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.6 }}
+                            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 text-cyan-700 text-[10px] font-black uppercase tracking-widest mb-4 border border-cyan-100/50"
                         >
-                            <Play size={10} /> Autocompletar Admin
-                        </button>
+                            <Sparkles size={12} /> Acceso Restringido
+                        </motion.span>
+                        <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-2">Iniciar Sesión</h2>
+                        <p className="text-slate-500 font-medium italic">Gestione su clínica con total control.</p>
                     </div>
 
-                    {error && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm flex items-center animate-pulse">
-                            <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            {error}
-                        </div>
-                    )}
+                    <AnimatePresence>
+                        {error && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl text-xs font-bold flex items-center gap-3"
+                            >
+                                <div className="h-6 w-6 rounded-full bg-rose-100 flex items-center justify-center shrink-0">!</div>
+                                {error}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Correo Electrónico</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                                    <Mail size={20} />
-                                </div>
+                        <div className="space-y-2">
+                            <label className="text-[13px] font-black text-slate-700 uppercase tracking-wider ml-1">Email</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-cyan-600 transition-colors" size={20} />
                                 <input
                                     type="email"
                                     required
-                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
-                                    placeholder="ejemplo@dental.com"
+                                    autoFocus
+                                    className="w-full pl-12 pr-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-cyan-500/10 focus:border-cyan-500 text-[15px] font-medium text-slate-700 transition-all placeholder:text-slate-400 shadow-sm"
+                                    placeholder="admin@dental.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
                             </div>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                                    <Lock size={20} />
-                                </div>
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[13px] font-black text-slate-700 uppercase tracking-wider">Contraseña</label>
+                                <button type="button" className="text-[11px] font-bold text-cyan-600 hover:text-cyan-700 transition-colors">Olvidé mi contraseña</button>
+                            </div>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-cyan-600 transition-colors" size={20} />
                                 <input
                                     type="password"
                                     required
-                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
+                                    className="w-full pl-12 pr-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-cyan-500/10 focus:border-cyan-500 text-[15px] font-medium text-slate-700 transition-all placeholder:text-slate-400 shadow-sm"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -110,27 +158,43 @@ const Login = () => {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center">
-                                <input id="remember-me" name="remember-me" type="checkbox" className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded" />
-                                <label htmlFor="remember-me" className="ml-2 block text-gray-600">Recordarme</label>
-                            </div>
-                            <a href="#" className="font-medium text-cyan-600 hover:text-cyan-500">¿Olvidaste tu contraseña?</a>
-                        </div>
-
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                            className="w-full group relative overflow-hidden py-4 px-6 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-slate-900/20 active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
-                            {isSubmitting ? (
-                                <Loader2 className="animate-spin h-5 w-5" />
-                            ) : (
-                                'Iniciar Sesión'
-                            )}
+                            <span className="relative z-10 flex items-center gap-2">
+                                {isSubmitting ? (
+                                    <Loader2 className="animate-spin" size={20} />
+                                ) : (
+                                    <>
+                                        Entrar al Sistema
+                                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
+                            </span>
+                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         </button>
                     </form>
+
+                    {/* Demo Credentials */}
+                    <div className="mt-8 p-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Entorno de Desarrollo</div>
+                        <button
+                            onClick={() => { setEmail('admin@dental.com'); setPassword('admin123'); }}
+                            className="text-[10px] font-black text-cyan-600 hover:text-cyan-700 flex items-center gap-1 group"
+                        >
+                            Cargar Admin <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
+                        </button>
+                    </div>
                 </div>
+            </motion.div>
+
+            {/* Float Decoration */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-7xl max-h-[800px] pointer-events-none opacity-20">
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="absolute top-0 right-0 w-96 h-96 blur-3xl">
+                    <path fill="#06B6D4" d="M47.5,-52.2C60.7,-41.8,69.9,-25.9,71.2,-9.2C72.5,7.5,65.8,25.1,54.7,38.9C43.5,52.8,27.8,62.9,11.2,65.8C-5.5,68.7,-23.1,64.4,-38.3,55.1C-53.5,45.8,-66.3,31.4,-70.5,14.6C-74.8,-2.2,-70.5,-21.5,-59.7,-34.5C-48.9,-47.5,-31.6,-54.2,-15.1,-58.3C1.4,-62.4,18.8,-63.9,34.4,-59.8" transform="translate(100 100)" />
+                </svg>
             </div>
         </div>
     );

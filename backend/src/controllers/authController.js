@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 
 const register = async (req, res) => {
     try {
-        const { email, password, name, role } = req.body;
+        const { email, password, name, role, companyId, branchId } = req.body;
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
@@ -19,6 +19,8 @@ const register = async (req, res) => {
                 password: hashedPassword,
                 name,
                 role: role || 'DENTIST',
+                companyId: companyId, // Required for multi-tenancy
+                branchId: branchId    // Optional but recommended
             },
         });
 
@@ -48,7 +50,13 @@ const login = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { userId: user.id, role: user.role, email: user.email },
+            {
+                userId: user.id,
+                role: user.role,
+                email: user.email,
+                companyId: user.companyId,
+                branchId: user.branchId
+            },
             process.env.JWT_SECRET,
             { expiresIn: process.env.JWT_EXPIRES_IN }
         );
@@ -60,6 +68,8 @@ const login = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                companyId: user.companyId,
+                branchId: user.branchId,
             },
         });
     } catch (error) {
