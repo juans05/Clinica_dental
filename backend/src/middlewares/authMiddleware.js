@@ -14,19 +14,24 @@ module.exports = async (req, res, next) => {
         }
 
         const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Decoded Token:', decodedToken);
 
         let companyId = decodedToken.companyId;
         let branchId = decodedToken.branchId;
 
         // Fallback for legacy tokens that don't have companyId/branchId
         if (!companyId) {
+            console.log('No companyId in token, fetching from DB for user:', decodedToken.userId);
             const user = await prisma.user.findUnique({
                 where: { id: decodedToken.userId },
                 select: { companyId: true, branchId: true }
             });
             if (user) {
+                console.log('Found user in DB, companyId:', user.companyId);
                 companyId = user.companyId;
                 branchId = user.branchId;
+            } else {
+                console.log('User not found in DB for fallback!');
             }
         }
 

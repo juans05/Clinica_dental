@@ -1,0 +1,68 @@
+const prisma = require('../utils/prisma');
+
+/**
+ * Saves or updates a clinical form (Anamnesis, Endodontics, etc.)
+ */
+exports.saveForm = async (req, res) => {
+    const { patientId, type, data } = req.body;
+    const doctorId = req.user.id;
+
+    try {
+        const form = await prisma.clinicalForm.upsert({
+            where: {
+                patientId_type: {
+                    patientId: parseInt(patientId),
+                    type: type
+                }
+            },
+            update: {
+                data: data,
+                doctorId: doctorId,
+                updatedAt: new Date()
+            },
+            create: {
+                patientId: parseInt(patientId),
+                type: type,
+                data: data,
+                doctorId: doctorId
+            }
+        });
+
+        res.json(form);
+    } catch (e) {
+        console.error('Error saving clinical form:', e);
+        res.status(500).json({ message: 'Error al guardar el formulario clínico', error: e.message });
+    }
+};
+
+/**
+ * Retrieves a specific clinical form for a patient
+ */
+exports.getForm = async (req, res) => {
+    const { patientId, type } = req.params;
+
+    try {
+        const form = await prisma.clinicalForm.findUnique({
+            where: {
+                patientId_type: {
+                    patientId: parseInt(patientId),
+                    type: type
+                }
+            },
+            include: {
+                doctor: {
+                    select: { name: true }
+                }
+            }
+        });
+
+        if (!form) {
+            return res.status(404).json({ message: 'Formulario no encontrado' });
+        }
+
+        res.json(form);
+    } catch (e) {
+        console.error('Error fetching clinical form:', e);
+        res.status(500).json({ message: 'Error al obtener el formulario clínico', error: e.message });
+    }
+};

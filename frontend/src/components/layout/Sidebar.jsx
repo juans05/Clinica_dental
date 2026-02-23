@@ -11,7 +11,8 @@ import {
     Menu,
     X,
     ChevronRight,
-    Stethoscope
+    Stethoscope,
+    Shield
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { clsx } from 'clsx';
@@ -21,10 +22,9 @@ const cn = (...inputs) => {
     return twMerge(clsx(inputs));
 }
 
-const Sidebar = () => {
+const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
     const { logout, user } = useAuth();
     const navigate = useNavigate();
-    const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
     const menuItems = [
@@ -32,6 +32,8 @@ const Sidebar = () => {
         { icon: Users, label: 'Pacientes', path: '/patients' },
         { icon: Calendar, label: 'Agenda', path: '/agenda' },
         { icon: FileText, label: 'Historias', path: '/history' },
+        { icon: Shield, label: 'Gestión', path: '/management' },
+        { icon: Stethoscope, label: 'Servicios', path: '/services' },
         { icon: Settings, label: 'Configuración', path: '/settings' },
     ];
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,10 +18,12 @@ import {
     Smartphone,
     Edit2,
     Trash2,
-    CheckCircle
+    CheckCircle,
+    ClipboardList
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import PatientRegistrationModal from '../../components/PatientRegistrationModal';
 
 const cn = (...inputs) => {
     return twMerge(clsx(inputs));
@@ -28,12 +31,11 @@ const cn = (...inputs) => {
 
 const Patients = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [showForm, setShowForm] = useState(false);
+    const [showRegistrationModal, setShowRegistrationModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isEditing, setIsEditing] = useState(false);
-    const [selectedId, setSelectedId] = useState(null);
 
     const initialFormState = {
         documentType: 'DNI',
@@ -68,7 +70,7 @@ const Patients = () => {
     const fetchPatients = async () => {
         setLoading(true);
         try {
-            const response = await api.get('/patients');
+            const response = await api.get('patients');
             setPatients(response.data);
         } catch (error) {
             console.error('Error fetching patients:', error);
@@ -97,22 +99,14 @@ const Patients = () => {
         });
     };
 
-    const handleEdit = (patient) => {
-        setIsEditing(true);
-        setSelectedId(patient.id);
-        const formattedDate = patient.birthDate ? new Date(patient.birthDate).toISOString().split('T')[0] : '';
-        setFormData({
-            ...patient,
-            birthDate: formattedDate,
-            age: calculateAge(formattedDate)
-        });
-        setShowForm(true);
+    const handleEdit = (patient, targetModule = 'filiation') => {
+        navigate(`/expediente/${patient.id}/${targetModule}`);
     };
 
     const handleDelete = async (id) => {
         if (window.confirm('¿Está seguro de desactivar este paciente?')) {
             try {
-                await api.delete(`/patients/${id}`);
+                await api.delete(`patients/${id}`);
                 fetchPatients();
             } catch (error) {
                 console.error('Error deleting patient:', error);
@@ -160,9 +154,9 @@ const Patients = () => {
             };
 
             if (isEditing) {
-                await api.put(`/patients/${selectedId}`, payload);
+                await api.put(`patients/${selectedId}`, payload);
             } else {
-                await api.post('/patients', payload);
+                await api.post('patients', payload);
             }
 
             closeForm();
@@ -174,7 +168,7 @@ const Patients = () => {
     };
 
     const closeForm = () => {
-        setShowForm(false);
+        setViewMode('list');
         setIsEditing(false);
         setSelectedId(null);
         setFormData(initialFormState);
@@ -185,6 +179,7 @@ const Patients = () => {
         p.paternalSurname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.documentId.includes(searchQuery)
     );
+
 
     return (
         <div className="space-y-8 pb-10">
@@ -210,7 +205,12 @@ const Patients = () => {
                         <FileSpreadsheet size={18} /> Exportar
                     </button>
                     <button
-                        onClick={() => { setIsEditing(false); setShowForm(true); }}
+                        onClick={() => {
+                            setFormData(initialFormState);
+                            setIsEditing(false);
+                            setSelectedId(null);
+                            setShowRegistrationModal(true);
+                        }}
                         className="flex-1 md:flex-none premium-button-primary"
                     >
                         <Plus size={20} /> Nuevo Registro
@@ -274,6 +274,7 @@ const Patients = () => {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: i * 0.05 }}
+                                            onClick={() => handleEdit(p, 'filiation')}
                                             className="hover:bg-slate-50/50 transition-all group cursor-pointer"
                                         >
                                             <td className="px-8 py-6">
@@ -314,8 +315,25 @@ const Patients = () => {
                                             </td>
                                             <td className="px-8 py-6 text-right">
                                                 <div className="flex items-center justify-end gap-2">
+                                                    <Link
+                                                        to={`/expediente/${p.id}/history`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                        }}
+                                                        className="group/hist flex items-center gap-2 lg:gap-0 lg:hover:gap-2 px-3 py-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl text-indigo-500 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm active:scale-95 overflow-hidden"
+                                                    >
+                                                        <ClipboardList size={18} className="shrink-0" />
+                                                        <span className="lg:max-w-0 overflow-hidden whitespace-nowrap lg:group-hover/hist:max-w-[120px] max-w-[120px] transition-all duration-500 ease-in-out text-[10px] font-black uppercase tracking-widest leading-none">
+                                                            Abrir Historia
+                                                        </span>
+                                                    </Link>
                                                     <button
-                                                        onClick={() => handleEdit(p)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEdit(p, 'filiation');
+                                                        }}
                                                         className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-cyan-600 hover:border-cyan-500 transition-all shadow-sm active:scale-90"
                                                     >
                                                         <Edit2 size={16} />
@@ -337,225 +355,51 @@ const Patients = () => {
                 </div>
             </div>
 
-            {/* Modern Form Modal */}
-            <AnimatePresence>
-                {showForm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={closeForm}
-                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-                        />
+            {/* High-Fidelity Registration Modal */}
+            <PatientRegistrationModal
+                isOpen={showRegistrationModal}
+                onClose={() => setShowRegistrationModal(false)}
+                onSave={async (data) => {
+                    try {
+                        const lastName = `${data.paternalSurname || ''} ${data.maternalSurname || ''}`.trim();
 
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-[32px] shadow-[0_32px_80px_rgba(0,0,0,0.3)] w-full max-w-5xl h-[90vh] flex flex-col relative z-10 overflow-hidden border border-white/20"
-                        >
-                            {/* Modal Header */}
-                            <div className="p-8 pb-4 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-100">
-                                <div>
-                                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                                        {isEditing ? 'Actualizar Expediente' : 'Registro de Paciente'}
-                                    </h2>
-                                    <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1 italic">
-                                        {isEditing ? 'Modificando datos existentes' : 'Módulo de Ingreso Clínico'}
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={closeForm}
-                                    className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-rose-500 transition-all active:scale-95"
-                                >
-                                    <Plus className="rotate-45" size={28} />
-                                </button>
-                            </div>
+                        // Map complex types to backend schema
+                        const payload = {
+                            ...data,
+                            lastName: lastName || 'Paciente',
+                            tags: Array.isArray(data.tags) ? data.tags.join(',') : data.tags,
+                            // Ensure birthDate is a valid date string or null if empty
+                            birthDate: data.birthDate || new Date().toISOString().split('T')[0],
+                            // Handle Peruvian prefix for mobile
+                            phoneMobile: data.phoneMobile && !data.phoneMobile.startsWith('+51') ? `+51 ${data.phoneMobile}` : data.phoneMobile,
+                            // CRITICAL: For unique constraints, "" is a value. null is not (in some contexts).
+                            // In Prisma String? @unique, multiple nulls are allowed, but multiple "" are NOT.
+                            documentId: data.noDocument ? null : (data.documentId?.trim() || null)
+                        };
 
-                            {/* Modal Content */}
-                            <form onSubmit={handleSubmit} className="p-8 md:p-12 overflow-y-auto flex-1 space-y-12">
-                                {/* Identification Step */}
-                                <div className="space-y-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-8 w-8 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xs font-black">01</div>
-                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Identidad del Paciente</h3>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Tipo Documento</label>
-                                            <select
-                                                value={formData.documentType}
-                                                onChange={e => setFormData({ ...formData, documentType: e.target.value })}
-                                                className="premium-input bg-slate-50/50 border-slate-200/60"
-                                            >
-                                                <option value="DNI">DNI - NACIONAL</option>
-                                                <option value="CE">C.E. - EXTRANJERÍA</option>
-                                                <option value="PASS">PASAPORTE</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Número Documento *</label>
-                                            <input
-                                                required
-                                                type="text"
-                                                placeholder="Ej. 70123456"
-                                                value={formData.documentId}
-                                                onChange={e => setFormData({ ...formData, documentId: e.target.value })}
-                                                className="premium-input border-emerald-200/60 focus:ring-emerald-500/10 focus:border-emerald-500"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Nacionalidad</label>
-                                            <input
-                                                type="text"
-                                                value={formData.nationality}
-                                                onChange={e => setFormData({ ...formData, nationality: e.target.value })}
-                                                className="premium-input"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Apellido Paterno *</label>
-                                            <input
-                                                required
-                                                type="text"
-                                                value={formData.paternalSurname}
-                                                onChange={e => setFormData({ ...formData, paternalSurname: e.target.value })}
-                                                className="premium-input border-emerald-200/60"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Apellido Materno</label>
-                                            <input
-                                                type="text"
-                                                value={formData.maternalSurname}
-                                                onChange={e => setFormData({ ...formData, maternalSurname: e.target.value })}
-                                                className="premium-input"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Nombres *</label>
-                                            <input
-                                                required
-                                                type="text"
-                                                value={formData.firstName}
-                                                onChange={e => setFormData({ ...formData, firstName: e.target.value })}
-                                                className="premium-input border-emerald-200/60"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                        // Flatten guardian data if present
+                        if (data.guardian) {
+                            payload.guardianName = `${data.guardian.firstName || ''} ${data.guardian.paternalSurname || ''} ${data.guardian.maternalSurname || ''}`.trim();
+                            payload.guardianDocumentId = data.guardian.noDocument ? null : (data.guardian.documentId?.trim() || null);
+                            payload.guardianPhone = data.guardian.phoneMobile;
+                            delete payload.guardian;
+                        }
 
-                                {/* Personal Data Step */}
-                                <div className="space-y-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-8 w-8 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xs font-black">02</div>
-                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Datos Generales & Contacto</h3>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/40 p-6 rounded-[24px] border border-slate-100">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Nacimiento</label>
-                                            <input
-                                                type="date"
-                                                value={formData.birthDate}
-                                                onChange={e => handleBirthDateChange(e.target.value)}
-                                                className="premium-input"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Edad</label>
-                                            <input readOnly value={formData.age} className="premium-input bg-slate-100/50 text-slate-400 font-black" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Género</label>
-                                            <select
-                                                value={formData.gender}
-                                                onChange={e => setFormData({ ...formData, gender: e.target.value })}
-                                                className="premium-input"
-                                            >
-                                                <option>SIN ESPECIFICAR</option>
-                                                <option value="MALE">MASCULINO</option>
-                                                <option value="FEMALE">FEMENINO</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Celular *</label>
-                                            <input
-                                                required
-                                                type="tel"
-                                                placeholder="987 654 321"
-                                                value={formData.phoneMobile}
-                                                onChange={e => setFormData({ ...formData, phoneMobile: e.target.value })}
-                                                className="premium-input border-emerald-200/60"
-                                            />
-                                        </div>
-                                        <div className="space-y-2 md:col-span-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Correo Electrónico (Opcional)</label>
-                                            <input
-                                                type="email"
-                                                placeholder="paciente@correo.com"
-                                                value={formData.email}
-                                                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                                className="premium-input"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                        await api.post('patients', payload);
+                        fetchPatients();
+                    } catch (error) {
+                        console.error('Error creating patient:', error);
+                        const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message;
 
-                                {/* Address Step */}
-                                <div className="space-y-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-8 w-8 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xs font-black">03</div>
-                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Domicilio & Residencia</h3>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Distrito / Ciudad</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Miraflores, Lima"
-                                                value={formData.ubigeoAddress}
-                                                onChange={e => setFormData({ ...formData, ubigeoAddress: e.target.value })}
-                                                className="premium-input"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Dirección Exacta</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Av. Principal 123"
-                                                value={formData.address}
-                                                onChange={e => setFormData({ ...formData, address: e.target.value })}
-                                                className="premium-input"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </form>
-
-                            {/* Modal Footer */}
-                            <div className="p-8 bg-slate-50/50 backdrop-blur-md border-t border-slate-100 flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={closeForm}
-                                    className="px-8 py-4 rounded-2xl border-2 border-slate-800 bg-white text-slate-800 font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleSubmit}
-                                    className="px-8 py-4 rounded-2xl bg-emerald-600 text-white font-black text-xs uppercase tracking-widest hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 transition-all active:scale-95 flex items-center gap-2"
-                                >
-                                    {isEditing ? <CheckCircle size={18} /> : null}
-                                    {isEditing ? 'Actualizar Datos' : 'Guardar Paciente'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                        if (errorMsg.includes('Unique constraint failed on the fields: (`documentId`)')) {
+                            alert('No se pudo guardar: Este DNI ya está registrado en el sistema (puede estar desactivado).');
+                        } else {
+                            alert('Error al crear paciente: ' + errorMsg);
+                        }
+                        throw error;
+                    }
+                }}
+            />
         </div>
     );
 };

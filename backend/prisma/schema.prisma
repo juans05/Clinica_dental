@@ -7,23 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  DENTIST
-  RECEPTIONIST
-  ASSISTANT
-}
-
 model Company {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   name      String
-  taxId     String   @unique // RUC/NIT
-  active    Boolean  @default(true)
+  taxId     String    @unique
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   branches  Branch[]
-  users     User[]
   patients  Patient[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  services  Service[]
+  users     User[]
 }
 
 model Branch {
@@ -32,83 +26,187 @@ model Branch {
   address      String?
   phone        String?
   companyId    Int
-  company      Company       @relation(fields: [companyId], references: [id])
-  users        User[]
-  appointments Appointment[]
   active       Boolean       @default(true)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+  company      Company       @relation(fields: [companyId], references: [id])
+  users        User[]
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
-  email        String        @unique
-  password     String
-  name         String
-  role         Role          @default(DENTIST)
-  active       Boolean       @default(true)
-  companyId    Int
-  company      Company       @relation(fields: [companyId], references: [id])
-  branchId     Int?
-  branch       Branch?       @relation(fields: [branchId], references: [id])
-  appointments Appointment[] @relation("DoctorAppointments")
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id             Int             @id @default(autoincrement())
+  email          String          @unique
+  password       String
+  name           String
+  role           Role            @default(DENTIST)
+  active         Boolean         @default(true)
+  companyId      Int
+  branchId       Int?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  appointments   Appointment[]   @relation("DoctorAppointments")
+  clinicalForms  ClinicalForm[]  @relation("DoctorClinicalForms")
+  odontogramLogs OdontogramLog[] @relation("DoctorOdontogramLogs")
+  treatmentPlans TreatmentPlan[] @relation("DoctorTreatments")
+  branch         Branch?         @relation(fields: [branchId], references: [id])
+  company        Company         @relation(fields: [companyId], references: [id])
 }
 
 model Patient {
-  id               Int           @id @default(autoincrement())
-  firstName        String
-  lastName         String // We can keep this for compatibility or join paternal/maternal
-  paternalSurname  String?
-  maternalSurname  String?
-  documentType     String        @default("DNI")
-  documentId       String        @unique
-  nationality      String?       @default("Peruano")
-  birthDate        DateTime
-  gender           String        @default("SIN ESPECIFICAR")
-  civilStatus      String?       @default("SIN ESPECIFICAR")
-  phoneMobile      String?
-  phoneHome      String?
-  phone            String? // Keep for legacy compatibility
-  email            String?
-  webUser          String?
-  webPassword      String?
-  whatsappEnabled  Boolean       @default(true)
-  ubigeoAddress    String?
-  ubigeoCode       String?
-  address          String?
-  reference        String?
-  medicalHistory   String?
-  active           Boolean       @default(true)
-  companyId        Int
-  company          Company       @relation(fields: [companyId], references: [id])
-  appointments     Appointment[]
-  odontograms      Odontogram[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                 Int             @id @default(autoincrement())
+  firstName          String
+  lastName           String
+  paternalSurname    String?
+  maternalSurname    String?
+  documentType       String          @default("DNI")
+  documentId         String?         @unique
+  nationality        String?         @default("Peruano")
+  birthDate          DateTime
+  gender             String          @default("SIN ESPECIFICAR")
+  civilStatus        String?         @default("SIN ESPECIFICAR")
+  phoneMobile        String?
+  phoneHome          String?
+  phone              String?
+  email              String?
+  webUser            String?
+  webPassword        String?
+  whatsappEnabled    Boolean         @default(true)
+  ubigeoAddress      String?
+  ubigeoCode         String?
+  address            String?
+  reference          String?
+  medicalHistory     String?
+  active             Boolean         @default(true)
+  companyId          Int
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  additionalInfo     String?
+  allergies          String?
+  birthCountry       String?         @default("Perú")
+  fiscalData         Json?
+  guardianDocumentId String?
+  guardianName       String?
+  guardianPhone      String?
+  hasGuardian        Boolean         @default(false)
+  hcNumber           String?         @unique
+  insurance          String?
+  leadSource         String?
+  lineOfBusiness     String?
+  nickname           String?
+  notes              String?
+  occupation         String?
+  tags               String?
+  appointments       Appointment[]
+  clinicalForms      ClinicalForm[]
+  odontograms        Odontogram[]
+  odontogramLogs     OdontogramLog[]
+  company            Company         @relation(fields: [companyId], references: [id])
+  treatmentPlans     TreatmentPlan[]
 }
 
 model Appointment {
-  id         Int      @id @default(autoincrement())
-  date       DateTime
-  status     String   @default("SCHEDULED") // SCHEDULED, CONFIRMED, ATTENDED, CANCELLED
-  notes      String?
-  patientId  Int
-  patient    Patient  @relation(fields: [patientId], references: [id])
-  doctorId   Int
-  doctor     User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
-  branchId   Int
-  branch     Branch   @relation(fields: [branchId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             Int             @id @default(autoincrement())
+  date           DateTime
+  status         String          @default("SCHEDULED")
+  reason         String?
+  urgency        String          @default("NORMAL")
+  duration       Int             @default(30)
+  notes          String?
+  patientId      Int
+  doctorId       Int
+  branchId       Int
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  branch         Branch          @relation(fields: [branchId], references: [id])
+  doctor         User            @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  patient        Patient         @relation(fields: [patientId], references: [id])
+  treatmentItems TreatmentItem[]
+}
+
+model Service {
+  id             Int             @id @default(autoincrement())
+  name           String
+  category       String
+  description    String?
+  price          Float
+  duration       Int             @default(30)
+  active         Boolean         @default(true)
+  companyId      Int
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  company        Company         @relation(fields: [companyId], references: [id])
+  treatmentItems TreatmentItem[]
+}
+
+model TreatmentPlan {
+  id        Int             @id @default(autoincrement())
+  patientId Int
+  doctorId  Int
+  status    String          @default("PENDING")
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  items     TreatmentItem[]
+  doctor    User            @relation("DoctorTreatments", fields: [doctorId], references: [id])
+  patient   Patient         @relation(fields: [patientId], references: [id])
+}
+
+model TreatmentItem {
+  id              Int            @id @default(autoincrement())
+  treatmentPlanId Int?
+  serviceId       Int
+  toothNumber     String?
+  price           Float
+  status          String         @default("PENDING")
+  appointmentId   Int?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  appointment     Appointment?   @relation(fields: [appointmentId], references: [id])
+  service         Service        @relation(fields: [serviceId], references: [id])
+  treatmentPlan   TreatmentPlan? @relation(fields: [treatmentPlanId], references: [id])
 }
 
 model Odontogram {
   id        Int      @id @default(autoincrement())
-  data      Json // Dynamic state of teeth
+  data      Json
   patientId Int
-  patient   Patient  @relation(fields: [patientId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  patient   Patient  @relation(fields: [patientId], references: [id])
+}
+
+model OdontogramLog {
+  id          Int      @id @default(autoincrement())
+  patientId   Int
+  toothNumber String
+  conditionId String?
+  action      String
+  description String?
+  doctorId    Int
+  createdAt   DateTime @default(now())
+  doctor      User     @relation("DoctorOdontogramLogs", fields: [doctorId], references: [id])
+  patient     Patient  @relation(fields: [patientId], references: [id])
+}
+
+model ClinicalForm {
+  id        Int      @id @default(autoincrement())
+  type      String
+  data      Json
+  patientId Int
+  doctorId  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  doctor    User     @relation("DoctorClinicalForms", fields: [doctorId], references: [id])
+  patient   Patient  @relation(fields: [patientId], references: [id])
+
+  @@unique([patientId, type])
+}
+
+enum Role {
+  ADMIN
+  DENTIST
+  RECEPTIONIST
+  ASSISTANT
 }

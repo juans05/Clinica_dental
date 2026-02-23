@@ -5,8 +5,11 @@ import Dashboard from './pages/dashboard/Dashboard';
 import Patients from './pages/patients/Patients';
 import Agenda from './pages/agenda/Agenda';
 import History from './pages/history/History';
+import Management from './pages/settings/Management';
 import Settings from './pages/settings/Settings';
+import Services from './pages/settings/Services';
 import MainLayout from './components/layout/MainLayout';
+import PatientProfileView from './components/PatientProfileView';
 import { Loader2 } from 'lucide-react';
 
 const ProtectedRoute = ({ children }) => {
@@ -29,8 +32,11 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/patients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
+          <Route path="/expediente/:id/:module?" element={<ProtectedRoute><PatientProfileView /></ProtectedRoute>} />
           <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+          <Route path="/management" element={<ProtectedRoute><Management /></ProtectedRoute>} />
+          <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>

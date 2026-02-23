@@ -60,14 +60,25 @@ const createPatient = async (req, res) => {
             firstName,
             paternalSurname,
             maternalSurname,
+            nickname,
             documentType,
             documentId,
             nationality,
             birthDate,
+            birthCountry,
             gender,
             civilStatus,
+            hcNumber,
+            occupation,
+            lineOfBusiness,
+            additionalInfo,
+            allergies,
+            notes,
+            tags,
+            fiscalData,
             phoneMobile,
             phoneHome,
+            phone,
             email,
             webUser,
             webPassword,
@@ -76,7 +87,13 @@ const createPatient = async (req, res) => {
             ubigeoCode,
             address,
             reference,
-            medicalHistory
+            medicalHistory,
+            leadSource,
+            insurance,
+            hasGuardian,
+            guardianName,
+            guardianDocumentId,
+            guardianPhone
         } = req.body;
 
         const lastName = `${paternalSurname || ''} ${maternalSurname || ''}`.trim();
@@ -87,14 +104,25 @@ const createPatient = async (req, res) => {
                 lastName: lastName || 'Paciente',
                 paternalSurname,
                 maternalSurname,
+                nickname,
                 documentType,
                 documentId,
                 nationality,
                 birthDate: new Date(birthDate),
+                birthCountry: birthCountry || 'Perú',
                 gender,
                 civilStatus,
+                hcNumber,
+                occupation,
+                lineOfBusiness,
+                additionalInfo,
+                allergies,
+                notes,
+                tags,
+                fiscalData,
                 phoneMobile,
                 phoneHome,
+                phone,
                 email,
                 webUser,
                 webPassword,
@@ -104,6 +132,12 @@ const createPatient = async (req, res) => {
                 address,
                 reference,
                 medicalHistory,
+                leadSource,
+                insurance,
+                hasGuardian: !!hasGuardian,
+                guardianName,
+                guardianDocumentId,
+                guardianPhone,
                 active: true,
                 company: { connect: { id: parseInt(companyId) } }
             }
@@ -122,8 +156,49 @@ const updatePatient = async (req, res) => {
         const { companyId } = req.user;
         const data = req.body;
 
-        if (data.paternalSurname || data.maternalSurname) {
-            data.lastName = `${data.paternalSurname || ''} ${data.maternalSurname || ''}`.trim();
+        const updateData = {
+            firstName: data.firstName,
+            paternalSurname: data.paternalSurname,
+            maternalSurname: data.maternalSurname,
+            nickname: data.nickname,
+            documentType: data.documentType,
+            documentId: data.documentId,
+            nationality: data.nationality,
+            birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
+            birthCountry: data.birthCountry,
+            gender: data.gender,
+            civilStatus: data.civilStatus,
+            hcNumber: data.hcNumber,
+            occupation: data.occupation,
+            lineOfBusiness: data.lineOfBusiness,
+            additionalInfo: data.additionalInfo,
+            allergies: data.allergies,
+            notes: data.notes,
+            tags: data.tags,
+            fiscalData: data.fiscalData,
+            phoneMobile: data.phoneMobile,
+            phoneHome: data.phoneHome,
+            phone: data.phone,
+            email: data.email,
+            webUser: data.webUser,
+            webPassword: data.webPassword,
+            whatsappEnabled: data.whatsappEnabled,
+            ubigeoAddress: data.ubigeoAddress,
+            ubigeoCode: data.ubigeoCode,
+            address: data.address,
+            reference: data.reference,
+            medicalHistory: data.medicalHistory,
+            leadSource: data.leadSource,
+            insurance: data.insurance,
+            hasGuardian: data.hasGuardian !== undefined ? !!data.hasGuardian : undefined,
+            guardianName: data.guardianName,
+            guardianDocumentId: data.guardianDocumentId,
+            guardianPhone: data.guardianPhone,
+            active: data.active
+        };
+
+        if (updateData.paternalSurname || updateData.maternalSurname) {
+            updateData.lastName = `${updateData.paternalSurname || ''} ${updateData.maternalSurname || ''}`.trim();
         }
 
         const patient = await prisma.patient.updateMany({
@@ -132,8 +207,7 @@ const updatePatient = async (req, res) => {
                 companyId
             },
             data: {
-                ...data,
-                birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
+                ...updateData,
                 updatedAt: new Date()
             }
         });
@@ -144,8 +218,8 @@ const updatePatient = async (req, res) => {
 
         res.json({ message: 'Paciente actualizado exitosamente' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error al actualizar paciente' });
+        console.error('Error updating patient:', error);
+        res.status(500).json({ message: 'Error al actualizar paciente', error: error.message });
     }
 };
 

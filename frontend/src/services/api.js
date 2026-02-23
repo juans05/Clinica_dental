@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:3000/api', // Ajustar si el puerto cambia
+    baseURL: 'http://localhost:3000/api/', // Ajustar si el puerto cambia
     headers: {
         'Content-Type': 'application/json',
     },

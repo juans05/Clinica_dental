@@ -4,11 +4,17 @@ const jwt = require('jsonwebtoken');
 
 const register = async (req, res) => {
     try {
-        const { email, password, name, role, companyId, branchId } = req.body;
+        const { email, password, name, role, branchId } = req.body;
+        // companyId comes from the authenticated token (secure), fallback to body
+        const companyId = req.user?.companyId || req.body.companyId;
+
+        if (!email || !password || !name || !companyId) {
+            return res.status(400).json({ message: 'Campos requeridos: email, password, nombre, companyId' });
+        }
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
-            return res.status(400).json({ message: 'El usuario ya existe' });
+            return res.status(400).json({ message: 'El correo ya está en uso por otro usuario' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
@@ -19,15 +25,15 @@ const register = async (req, res) => {
                 password: hashedPassword,
                 name,
                 role: role || 'DENTIST',
-                companyId: companyId, // Required for multi-tenancy
-                branchId: branchId    // Optional but recommended
+                companyId: parseInt(companyId),
+                branchId: branchId ? parseInt(branchId) : null,
             },
         });
 
         res.status(201).json({ message: 'Usuario creado exitosamente', userId: user.id });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error en el servidor', error: error.message });
+        console.error('Error en register:', error);
+        res.status(500).json({ message: 'Error en el servidor', detail: error.message });
     }
 };
 
@@ -78,7 +84,85 @@ const login = async (req, res) => {
     }
 };
 
+const getUsers = async (req, res) => {
+    try {
+        const { companyId } = req.user;
+        const { role } = req.query;
+
+        const users = await prisma.user.findMany({
+            where: {
+                companyId,
+                role: role ? role : undefined,
+                active: true
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                branchId: true
+            }
+        });
+
+        res.json(users);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error al obtener usuarios' });
+    }
+};
+
+const updateUser = async (req, res) => {
+    try {
+        const { companyId } = req.user;
+        const { id } = req.params;
+        const { name, email, role, branchId, active } = req.body;
+
+        const user = await prisma.user.update({
+            where: {
+                id: parseInt(id),
+                companyId // Security check
+            },
+            data: {
+                name,
+                email,
+                role: role ? role : undefined,
+                branchId: branchId ? parseInt(branchId) : (branchId === null ? null : undefined),
+                active,
+                updatedAt: new Date()
+            }
+        });
+
+        res.json(user);
+    } catch (error) {
+        console.error('Error updating user:', error);
+        res.status(500).json({ message: 'Error al actualizar el usuario' });
+    }
+};
+
+const deleteUser = async (req, res) => {
+    try {
+        const { companyId } = req.user;
+        const { id } = req.params;
+
+        await prisma.user.update({
+            where: {
+                id: parseInt(id),
+                companyId
+            },
+            data: { active: false }
+        });
+
+        res.json({ message: 'Usuario desactivado exitosamente' });
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ message: 'Error al eliminar el usuario' });
+    }
+};
+
 module.exports = {
     register,
     login,
+    getUsers,
+    updateUser,
+    deleteUser
 };
