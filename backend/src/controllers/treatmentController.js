@@ -25,6 +25,8 @@ const getTreatmentPlans = async (req, res) => {
                     },
                     orderBy: { createdAt: 'asc' },
                 },
+                payments: true,
+                invoices: true,
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -48,6 +50,8 @@ const getTreatmentPlanById = async (req, res) => {
                     include: { service: true },
                     orderBy: { createdAt: 'asc' },
                 },
+                payments: true,
+                invoices: true,
             },
         });
         if (!plan) return res.status(404).json({ message: 'Plan de tratamiento no encontrado' });
@@ -60,7 +64,7 @@ const getTreatmentPlanById = async (req, res) => {
 // POST /api/treatments
 const createTreatmentPlan = async (req, res) => {
     try {
-        const { patientId, doctorId, notes, items } = req.body;
+        const { patientId, doctorId, name, discount, notes, notesPatient, notesInternal, items } = req.body;
 
         if (!patientId || !doctorId) {
             return res.status(400).json({ message: 'Campos requeridos: patientId, doctorId' });
@@ -70,13 +74,18 @@ const createTreatmentPlan = async (req, res) => {
             data: {
                 patientId: parseInt(patientId),
                 doctorId: parseInt(doctorId),
+                name: name || null,
+                discount: parseFloat(discount) || 0,
                 notes: notes || null,
+                notesPatient: notesPatient || null,
+                notesInternal: notesInternal || null,
                 items: items && items.length > 0 ? {
                     create: items.map(item => ({
                         serviceId: parseInt(item.serviceId),
                         toothNumber: item.toothNumber || null,
                         price: parseFloat(item.price),
                         quantity: parseInt(item.quantity) || 1,
+                        discount: parseFloat(item.discount) || 0,
                         notes: item.notes || null,
                     })),
                 } : undefined,
@@ -98,13 +107,17 @@ const createTreatmentPlan = async (req, res) => {
 const updateTreatmentPlan = async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        const { status, notes } = req.body;
+        const { status, notes, name, discount, notesPatient, notesInternal } = req.body;
 
         const plan = await prisma.treatmentPlan.update({
             where: { id },
             data: {
                 ...(status && { status }),
                 ...(notes !== undefined && { notes }),
+                ...(name !== undefined && { name }),
+                ...(discount !== undefined && { discount: parseFloat(discount) }),
+                ...(notesPatient !== undefined && { notesPatient }),
+                ...(notesInternal !== undefined && { notesInternal }),
             },
         });
         res.json(plan);
@@ -117,7 +130,7 @@ const updateTreatmentPlan = async (req, res) => {
 const addTreatmentItem = async (req, res) => {
     try {
         const treatmentPlanId = parseInt(req.params.id);
-        const { serviceId, toothNumber, price, notes, appointmentId, quantity } = req.body;
+        const { serviceId, toothNumber, price, notes, appointmentId, quantity, discount } = req.body;
 
         if (!serviceId || price === undefined) {
             return res.status(400).json({ message: 'Campos requeridos: serviceId, price' });
@@ -130,6 +143,7 @@ const addTreatmentItem = async (req, res) => {
                 toothNumber: toothNumber || null,
                 price: parseFloat(price),
                 quantity: parseInt(quantity) || 1,
+                discount: parseFloat(discount) || 0,
                 notes: notes || null,
                 appointmentId: appointmentId ? parseInt(appointmentId) : null,
             },
@@ -146,7 +160,7 @@ const addTreatmentItem = async (req, res) => {
 const updateTreatmentItem = async (req, res) => {
     try {
         const id = parseInt(req.params.itemId);
-        const { status, notes, price, toothNumber, appointmentId, quantity } = req.body;
+        const { status, notes, price, toothNumber, appointmentId, quantity, discount } = req.body;
 
         const item = await prisma.treatmentItem.update({
             where: { id },
@@ -155,6 +169,7 @@ const updateTreatmentItem = async (req, res) => {
                 ...(notes !== undefined && { notes }),
                 ...(price !== undefined && { price: parseFloat(price) }),
                 ...(quantity !== undefined && { quantity: parseInt(quantity) }),
+                ...(discount !== undefined && { discount: parseFloat(discount) }),
                 ...(toothNumber !== undefined && { toothNumber }),
                 ...(appointmentId !== undefined && { appointmentId: appointmentId ? parseInt(appointmentId) : null }),
             },

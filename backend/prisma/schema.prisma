@@ -8,16 +8,23 @@ datasource db {
 }
 
 model Company {
-  id        Int       @id @default(autoincrement())
-  name      String
-  taxId     String    @unique
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  branches  Branch[]
-  patients  Patient[]
-  services  Service[]
-  users     User[]
+  id             Int       @id @default(autoincrement())
+  name           String
+  commercialName String?
+  taxId          String    @unique
+  phone          String?
+  address        String?
+  receptionEmail String?
+  logo           String?
+  website        String?
+  description    String?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  branches       Branch[]
+  patients       Patient[]
+  services       Service[]
+  users          User[]
 }
 
 model Branch {
@@ -140,16 +147,22 @@ model Service {
 }
 
 model TreatmentPlan {
-  id        Int             @id @default(autoincrement())
-  patientId Int
-  doctorId  Int
-  status    String          @default("PENDING")
-  notes     String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  items     TreatmentItem[]
-  doctor    User            @relation("DoctorTreatments", fields: [doctorId], references: [id])
-  patient   Patient         @relation(fields: [patientId], references: [id])
+  id           Int             @id @default(autoincrement())
+  patientId    Int
+  doctorId     Int
+  name         String?
+  status       String          @default("PENDING")
+  discount     Float           @default(0)
+  notes        String?
+  notesPatient String?
+  notesInternal String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  items        TreatmentItem[]
+  payments     Payment[]
+  doctor       User            @relation("DoctorTreatments", fields: [doctorId], references: [id])
+  patient      Patient         @relation(fields: [patientId], references: [id])
+  invoices     Invoice[]       @relation("TreatmentInvoices")
 }
 
 model TreatmentItem {
@@ -158,6 +171,8 @@ model TreatmentItem {
   serviceId       Int
   toothNumber     String?
   price           Float
+  quantity        Int            @default(1)
+  discount        Float          @default(0)
   status          String         @default("PENDING")
   appointmentId   Int?
   notes           String?
@@ -165,6 +180,32 @@ model TreatmentItem {
   updatedAt       DateTime       @updatedAt
   appointment     Appointment?   @relation(fields: [appointmentId], references: [id])
   service         Service        @relation(fields: [serviceId], references: [id])
+  treatmentPlan   TreatmentPlan? @relation(fields: [treatmentPlanId], references: [id])
+}
+
+model Invoice {
+  id              Int             @id @default(autoincrement())
+  number          String          @unique
+  type            String          @default("BOLETA") // BOLETA, FACTURA
+  status          String          @default("PAID")   // PAID, VOID
+  total           Float
+  patientId       Int
+  companyId       Int
+  treatmentPlanId Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  treatmentPlan   TreatmentPlan?  @relation("TreatmentInvoices", fields: [treatmentPlanId], references: [id])
+}
+
+model Payment {
+  id              Int            @id @default(autoincrement())
+  amount          Float
+  method          String         @default("CASH") // CASH, CARD, TRANSFER
+  reference       String?
+  treatmentPlanId Int?
+  appointmentId   Int?
+  companyId       Int
+  createdAt       DateTime       @default(now())
   treatmentPlan   TreatmentPlan? @relation(fields: [treatmentPlanId], references: [id])
 }
 

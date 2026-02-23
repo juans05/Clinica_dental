@@ -9,6 +9,8 @@ const serviceRoutes = require('./serviceRoutes');
 const treatmentRoutes = require('./treatmentRoutes');
 const odontogramRoutes = require('./odontogramRoutes');
 const clinicalRoutes = require('./clinicalRoutes');
+const companyRoutes = require('./companyRoutes');
+const billingRoutes = require('./billingRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/patients', patientRoutes);
@@ -18,5 +20,7 @@ router.use('/services', serviceRoutes);
 router.use('/treatments', treatmentRoutes);
 router.use('/odontograms', odontogramRoutes);
 router.use('/clinical', clinicalRoutes);
+router.use('/company', companyRoutes);
+router.use('/billing', billingRoutes);
 
 module.exports = router;
