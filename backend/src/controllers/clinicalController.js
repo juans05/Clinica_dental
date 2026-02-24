@@ -5,10 +5,14 @@ const prisma = require('../utils/prisma');
  */
 exports.saveForm = async (req, res) => {
     const { patientId, type, data } = req.body;
-    const doctorId = req.user.id;
+    const doctorId = parseInt(req.user.id || req.user.userId);
+
+    if (isNaN(doctorId)) {
+        return res.status(403).json({ message: 'Sesión inválida: No se pudo identificar al odontólogo.' });
+    }
 
     const pId = parseInt(patientId);
-    const dId = parseInt(doctorId);
+    const dId = doctorId;
 
     try {
         const form = await prisma.clinicalForm.upsert({

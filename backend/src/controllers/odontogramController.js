@@ -27,8 +27,12 @@ const saveOdontogram = async (req, res) => {
     try {
         const patientId = parseInt(req.params.patientId);
         const companyId = parseInt(req.user.companyId);
-        const doctorId = parseInt(req.user.id);
+        const doctorId = parseInt(req.user.id || req.user.userId);
         const { data, logs } = req.body;
+
+        if (isNaN(doctorId)) {
+            return res.status(403).json({ message: 'Sesión inválida: No se pudo identificar al odontólogo.' });
+        }
 
         if (!data) return res.status(400).json({ message: 'Se requiere el campo data' });
 
@@ -56,21 +60,32 @@ const saveOdontogram = async (req, res) => {
 
         // Process logs if any
         if (logs && Array.isArray(logs) && logs.length > 0) {
-            await prisma.odontogramLog.createMany({
-                data: logs.map(log => ({
-                    patientId,
-                    toothNumber: log.toothNumber.toString(),
-                    conditionId: log.conditionId || null,
-                    action: log.action, // ADD, REMOVE, UPDATE_NOTE
-                    description: log.description || null,
-                    doctorId,
-                }))
-            });
+            try {
+                await prisma.odontogramLog.createMany({
+                    data: logs.map((log, index) => {
+                        if (!log.toothNumber) {
+                            console.warn(`[saveOdontogram] Log at index ${index} missing toothNumber:`, log);
+                        }
+                        return {
+                            patientId,
+                            toothNumber: (log.toothNumber || '0').toString(),
+                            conditionId: log.conditionId || null,
+                            action: log.action || 'UNKNOWN',
+                            description: log.description || null,
+                            doctorId: !isNaN(doctorId) ? doctorId : undefined,
+                        };
+                    })
+                });
+            } catch (logError) {
+                console.error('Error saving odontogram logs:', logError);
+                // We continue even if logs fail, but we log the error
+            }
         }
 
         res.json(odontogram);
     } catch (error) {
-        console.error('Error saveOdontogram:', error);
+        console.error('CRITICAL ERROR saveOdontogram:', error);
+        console.error('Payload attempted:', { patientId, logsLength: logs?.length });
         res.status(500).json({ message: 'Error al guardar odontograma', detail: error.message });
     }
 };

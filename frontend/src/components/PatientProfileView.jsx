@@ -13,6 +13,8 @@ import Odontograma from './Odontograma';
 import InitialTreatmentView from './InitialTreatmentView';
 import QuestionnaireView from './QuestionnaireView';
 import BudgetModule from './BudgetModule';
+import FilesModule from './FilesModule';
+import ConsentModule from './ConsentModule';
 import usePatientStore from '../store/usePatientStore';
 
 const cn = (...inputs) => twMerge(clsx(inputs));
@@ -120,10 +122,11 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
         { id: 'history', label: 'Historia clínica', icon: FileText },
         { id: 'odontogram', label: 'Odontograma', icon: Activity },
         { id: 'budgets', label: 'Presupuestos', icon: DollarSign },
-        { id: 'periodontogram', label: 'Periodontograma', icon: Activity },
-        { id: 'orthodontics', label: 'Ortodoncia', icon: Stethoscope },
+        // { id: 'periodontogram', label: 'Periodontograma', icon: Activity },
+        // { id: 'orthodontics', label: 'Ortodoncia', icon: Stethoscope },
         { id: 'account', label: 'Estado de cuenta', icon: CreditCard },
         { id: 'prescriptions', label: 'Prescripciones', icon: ClipboardList },
+        { id: 'consents', label: 'Consentimientos', icon: Shield },
         { id: 'files', label: 'Archivos', icon: FileText },
     ];
 
@@ -473,20 +476,29 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
                     )}
 
                     {activeModule === 'odontogram' && (
-                        <div className="h-full overflow-y-auto">
-                            <InitialTreatmentView
-                                patientId={patientId}
-                                onBack={() => setActiveModule('filiation')}
-                            />
+                        <div className="h-full overflow-y-auto p-8">
+                            <Odontograma patientId={patientId} />
                         </div>
                     )}
 
                     {activeModule === 'budgets' && (
-                        <div className="h-full overflow-y-auto">
+                        <div className="h-full overflow-y-auto p-8">
                             <BudgetModule
                                 patientId={patientId}
                                 patientName={`${patient.firstName} ${patient.paternalSurname}`}
                             />
+                        </div>
+                    )}
+
+                    {activeModule === 'consents' && (
+                        <div className="h-full overflow-y-auto p-8">
+                            <ConsentModule patientId={patientId} />
+                        </div>
+                    )}
+
+                    {activeModule === 'files' && (
+                        <div className="h-full overflow-y-auto p-8">
+                            <FilesModule patientId={patientId} />
                         </div>
                     )}
 
@@ -534,15 +546,20 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
                     )}
 
 
-                    {(activeModule !== 'filiation' && activeModule !== 'odontogram' && activeModule !== 'history') && (
-                        <div className="flex-1 flex flex-col items-center justify-center p-20 text-center grayscale opacity-30">
-                            <div className="h-32 w-32 rounded-full border-4 border-dashed border-slate-300 flex items-center justify-center mb-6">
-                                <ClipboardList size={48} className="text-slate-400" />
+                    {(activeModule !== 'filiation' &&
+                        activeModule !== 'odontogram' &&
+                        activeModule !== 'history' &&
+                        activeModule !== 'budgets' &&
+                        activeModule !== 'consents' &&
+                        activeModule !== 'files') && (
+                            <div className="flex-1 flex flex-col items-center justify-center p-20 text-center grayscale opacity-30">
+                                <div className="h-32 w-32 rounded-full border-4 border-dashed border-slate-300 flex items-center justify-center mb-6">
+                                    <ClipboardList size={48} className="text-slate-400" />
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-800 tracking-tight">Módulo en Desarrollo</h3>
+                                <p className="text-sm font-medium text-slate-400 mt-2 max-w-xs">Este módulo clínico está siendo preparado por nuestro equipo de odontología especializada.</p>
                             </div>
-                            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Módulo en Desarrollo</h3>
-                            <p className="text-sm font-medium text-slate-400 mt-2 max-w-xs">Este módulo clínico está siendo preparado por nuestro equipo de odontología especializada.</p>
-                        </div>
-                    )}
+                        )}
 
                     <button
                         onClick={onBack}

@@ -14,33 +14,46 @@ module.exports = async (req, res, next) => {
         }
 
         const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-        console.log('Decoded Token:', decodedToken);
 
+        // Robust ID search
+        let rawUserId = decodedToken.userId || decodedToken.id || decodedToken.sub;
         let companyId = decodedToken.companyId;
         let branchId = decodedToken.branchId;
 
-        // Fallback for legacy tokens that don't have companyId/branchId
-        if (!companyId) {
-            console.log('No companyId in token, fetching from DB for user:', decodedToken.userId);
-            const user = await prisma.user.findUnique({
-                where: { id: decodedToken.userId },
-                select: { companyId: true, branchId: true }
+        // Fallback for legacy tokens or missing primary fields
+        if (!rawUserId || !companyId) {
+            const user = await prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { email: decodedToken.email },
+                        { id: parseInt(rawUserId) || -1 }
+                    ]
+                },
+                select: { id: true, companyId: true, branchId: true }
             });
+
             if (user) {
-                console.log('Found user in DB, companyId:', user.companyId);
-                companyId = user.companyId;
-                branchId = user.branchId;
-            } else {
-                console.log('User not found in DB for fallback!');
+                rawUserId = user.id;
+                companyId = companyId || user.companyId;
+                branchId = branchId || user.branchId;
             }
         }
 
+        const userId = parseInt(rawUserId);
+
+        // STOPSHIP: Critical validation to prevent NaN propagating to business logic
+        if (isNaN(userId)) {
+            console.error('[AuthMiddleware] Critical: Could not resolve valid integer userId from token:', decodedToken);
+            return res.status(401).json({ message: 'Sesión inválida o corrupta. Por favor, inicie sesión nuevamente.' });
+        }
+
         req.user = {
-            userId: decodedToken.userId,
+            id: userId,
+            userId: userId,
             role: decodedToken.role,
             email: decodedToken.email,
-            companyId,
-            branchId
+            companyId: parseInt(companyId),
+            branchId: branchId ? parseInt(branchId) : null
         };
         next();
     } catch (error) {

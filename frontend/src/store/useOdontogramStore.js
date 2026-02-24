@@ -9,6 +9,7 @@ const defaultTooth = () => ({
     conditions: [],
     surfaces: { O: [], V: [], L: [], M: [], D: [] },
     notes: '',
+    evolutionState: null, // CURADO, PENDIENTE, CANCELADO
 });
 
 const buildState = () => Object.fromEntries(ALL_TEETH.map(n => [n, defaultTooth()]));
@@ -17,6 +18,7 @@ const useOdontogramStore = create((set, get) => ({
     teeth: buildState(),
     selected: null,
     activeTool: 'CARIES',
+    activeMode: 'INITIAL', // INITIAL o EVOLUTION
     isTemporary: false,
     loading: false,
     saving: false,
@@ -29,6 +31,13 @@ const useOdontogramStore = create((set, get) => ({
     toggleTemporary: () => set(state => ({ isTemporary: !state.isTemporary })),
     setActiveTool: (tool) => set({ activeTool: tool }),
     setSelected: (n) => set({ selected: n }),
+    setActiveMode: (mode) => set({ activeMode: mode }),
+
+    setEvolutionState: (n, state) => set((stateStore) => {
+        const teeth = { ...stateStore.teeth };
+        teeth[n] = { ...teeth[n], evolutionState: state };
+        return { teeth, dirty: true };
+    }),
 
     fetchOdontogram: async (patientId) => {
         if (!patientId || get().loading) {
@@ -72,7 +81,8 @@ const useOdontogramStore = create((set, get) => ({
                             ...mergedTeeth[n],
                             conditions: normConditions,
                             surfaces: normSurfaces,
-                            notes: raw?.notes || ''
+                            notes: raw?.notes || '',
+                            evolutionState: raw?.evolutionState || null // Normalizar evolución
                         };
                     }
                 });

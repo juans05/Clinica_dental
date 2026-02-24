@@ -25,6 +25,9 @@ model Company {
   patients       Patient[]
   services       Service[]
   users          User[]
+  consentTemplates ConsentTemplate[]
+  payments       Payment[]
+  invoices       Invoice[]
 }
 
 model Branch {
@@ -39,6 +42,7 @@ model Branch {
   appointments Appointment[]
   company      Company       @relation(fields: [companyId], references: [id])
   users        User[]
+  consultories Consultory[]
 }
 
 model User {
@@ -110,6 +114,8 @@ model Patient {
   odontogramLogs     OdontogramLog[]
   company            Company         @relation(fields: [companyId], references: [id])
   treatmentPlans     TreatmentPlan[]
+  consents           PatientConsent[]
+  patientFiles       PatientFile[]
 }
 
 model Appointment {
@@ -129,6 +135,8 @@ model Appointment {
   doctor         User            @relation("DoctorAppointments", fields: [doctorId], references: [id])
   patient        Patient         @relation(fields: [patientId], references: [id])
   treatmentItems TreatmentItem[]
+  consultoryId   Int?
+  consultory     Consultory?     @relation(fields: [consultoryId], references: [id])
 }
 
 model Service {
@@ -193,8 +201,9 @@ model Invoice {
   companyId       Int
   treatmentPlanId Int?
   createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  updatedAt      DateTime        @updatedAt
   treatmentPlan   TreatmentPlan?  @relation("TreatmentInvoices", fields: [treatmentPlanId], references: [id])
+  company         Company         @relation(fields: [companyId], references: [id])
 }
 
 model Payment {
@@ -207,6 +216,7 @@ model Payment {
   companyId       Int
   createdAt       DateTime       @default(now())
   treatmentPlan   TreatmentPlan? @relation(fields: [treatmentPlanId], references: [id])
+  company         Company        @relation(fields: [companyId], references: [id])
 }
 
 model Odontogram {
@@ -250,4 +260,48 @@ enum Role {
   DENTIST
   RECEPTIONIST
   ASSISTANT
+}
+
+model Consultory {
+  id        Int           @id @default(autoincrement())
+  name      String
+  branchId  Int
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  branch    Branch        @relation(fields: [branchId], references: [id])
+  appointments Appointment[]
+}
+
+model ConsentTemplate {
+  id        Int              @id @default(autoincrement())
+  title     String
+  content   String           @db.Text
+  active    Boolean          @default(true)
+  companyId Int
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  company   Company          @relation(fields: [companyId], references: [id])
+  consents  PatientConsent[]
+}
+
+model PatientConsent {
+  id         Int             @id @default(autoincrement())
+  patientId  Int
+  templateId Int
+  signature  String?         @db.Text // Base64 signature
+  fileUrl    String?         // Cloudinary URL for signed document
+  signedAt   DateTime        @default(now())
+  patient    Patient         @relation(fields: [patientId], references: [id])
+  template   ConsentTemplate @relation(fields: [templateId], references: [id])
+}
+
+model PatientFile {
+  id        Int      @id @default(autoincrement())
+  name      String
+  url       String
+  type      String?  // image, pdf, etc.
+  patientId Int
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  createdAt DateTime @default(now())
 }

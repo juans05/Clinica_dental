@@ -12,7 +12,8 @@ import {
     Shield,
     Phone,
     Mail,
-    Power
+    Power,
+    Activity
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -27,7 +28,8 @@ const Management = () => {
     const { user: currentUser } = useAuth();
     const [branches, setBranches] = useState([]);
     const [doctors, setDoctors] = useState([]);
-    const [activeTab, setActiveTab] = useState('BRANCHES'); // 'BRANCHES' or 'DOCTORS'
+    const [consultories, setConsultories] = useState([]);
+    const [activeTab, setActiveTab] = useState('BRANCHES'); // 'BRANCHES', 'DOCTORS', 'CONSULTORIES'
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
@@ -35,6 +37,7 @@ const Management = () => {
     // Form States
     const [branchForm, setBranchForm] = useState({ name: '', address: '', phone: '' });
     const [doctorForm, setDoctorForm] = useState({ name: '', email: '', password: '', role: 'DENTIST', branchId: '' });
+    const [consultoryForm, setConsultoryForm] = useState({ name: '', branchId: '' });
 
     useEffect(() => {
         fetchData();
@@ -43,12 +46,14 @@ const Management = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [bRes, dRes] = await Promise.all([
+            const [bRes, dRes, cRes] = await Promise.all([
                 api.get('branches'),
-                api.get('auth/users?role=DENTIST')
+                api.get('auth/users?role=DENTIST'),
+                api.get('consultories')
             ]);
             setBranches(bRes.data);
             setDoctors(dRes.data);
+            setConsultories(cRes.data);
         } catch (error) {
             console.error('Error fetching management data:', error);
         } finally {
@@ -88,11 +93,28 @@ const Management = () => {
         }
     };
 
+    const handleSaveConsultory = async (e) => {
+        e.preventDefault();
+        try {
+            if (editingItem) {
+                await api.patch(`consultories/${editingItem.id}`, consultoryForm);
+            } else {
+                await api.post('consultories', consultoryForm);
+            }
+            setShowModal(false);
+            fetchData();
+        } catch (error) {
+            const msg = error.response?.data?.detail || error.response?.data?.message || error.message;
+            alert('Error al guardar consultorio: ' + msg);
+        }
+    };
+
     const handleDelete = async (type, id) => {
         if (!window.confirm('¿Está seguro de desactivar este registro?')) return;
         try {
             if (type === 'BRANCH') await api.delete(`branches/${id}`);
-            else await api.delete(`auth/users/${id}`);
+            else if (type === 'DOCTOR') await api.delete(`auth/users/${id}`);
+            else if (type === 'CONSULTORY') await api.patch(`consultories/${id}`, { active: false });
             fetchData();
         } catch (error) {
             const msg = error.response?.data?.message || error.message;
@@ -120,8 +142,10 @@ const Management = () => {
         setEditingItem(item);
         if (type === 'BRANCH') {
             setBranchForm(item ? { name: item.name, address: item.address || '', phone: item.phone || '' } : { name: '', address: '', phone: '' });
-        } else {
+        } else if (type === 'DOCTOR') {
             setDoctorForm(item ? { name: item.name, email: item.email, role: item.role, branchId: item.branchId || '' } : { name: '', email: '', password: '', role: 'DENTIST', branchId: '' });
+        } else {
+            setConsultoryForm(item ? { name: item.name, branchId: item.branchId } : { name: '', branchId: '' });
         }
         setShowModal(true);
     };
@@ -143,10 +167,13 @@ const Management = () => {
                 </div>
 
                 <button
-                    onClick={() => openModal(activeTab === 'BRANCHES' ? 'BRANCH' : 'DOCTOR')}
+                    onClick={() => {
+                        const type = activeTab === 'BRANCHES' ? 'BRANCH' : (activeTab === 'DOCTORS' ? 'DOCTOR' : 'CONSULTORY');
+                        openModal(type);
+                    }}
                     className="premium-button-primary w-full md:w-auto"
                 >
-                    <Plus size={20} /> {activeTab === 'BRANCHES' ? 'Nueva Sede' : 'Nuevo Doctor'}
+                    <Plus size={20} /> {activeTab === 'BRANCHES' ? 'Nueva Sede' : (activeTab === 'DOCTORS' ? 'Nuevo Doctor' : 'Nuevo Consultorio')}
                 </button>
             </div>
 
@@ -170,6 +197,15 @@ const Management = () => {
                 >
                     <Shield size={16} className="inline mr-2" /> Médicos & Personal
                 </button>
+                <button
+                    onClick={() => setActiveTab('CONSULTORIES')}
+                    className={cn(
+                        "px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                        activeTab === 'CONSULTORIES' ? "bg-white text-emerald-600 shadow-md" : "text-slate-400 hover:text-slate-600"
+                    )}
+                >
+                    <Activity size={16} className="inline mr-2" /> Consultorios / Sillones
+                </button>
             </div>
 
             {/* List Section */}
@@ -185,11 +221,18 @@ const Management = () => {
                                         <th className="px-8 py-6 uppercase">Estado</th>
                                         <th className="px-8 py-6 text-right uppercase">Acciones</th>
                                     </>
-                                ) : (
+                                ) : activeTab === 'DOCTORS' ? (
                                     <>
                                         <th className="px-8 py-6 uppercase">Médico / Especialista</th>
                                         <th className="px-8 py-6 uppercase">Acceso / Email</th>
                                         <th className="px-8 py-6 uppercase">Sede Asignada</th>
+                                        <th className="px-8 py-6 text-right uppercase">Acciones</th>
+                                    </>
+                                ) : (
+                                    <>
+                                        <th className="px-8 py-6 uppercase">Nombre Consultorio</th>
+                                        <th className="px-8 py-6 uppercase">Sede</th>
+                                        <th className="px-8 py-6 uppercase">Estado</th>
                                         <th className="px-8 py-6 text-right uppercase">Acciones</th>
                                     </>
                                 )}
@@ -202,7 +245,7 @@ const Management = () => {
                                         <div className="h-10 w-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                                     </td>
                                 </tr>
-                            ) : (activeTab === 'BRANCHES' ? branches : doctors).map(item => (
+                            ) : (activeTab === 'BRANCHES' ? branches : (activeTab === 'DOCTORS' ? doctors : consultories)).map(item => (
                                 <motion.tr
                                     key={item.id}
                                     initial={{ opacity: 0 }}
@@ -234,7 +277,7 @@ const Management = () => {
                                                 </span>
                                             </td>
                                         </>
-                                    ) : (
+                                    ) : activeTab === 'DOCTORS' ? (
                                         <>
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center gap-4">
@@ -258,18 +301,49 @@ const Management = () => {
                                                 </div>
                                             </td>
                                         </>
+                                    ) : (
+                                        <>
+                                            <td className="px-8 py-6">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
+                                                        <Activity size={20} />
+                                                    </div>
+                                                    <span className="font-black text-slate-800 uppercase tracking-tight">{item.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="text-xs font-bold text-slate-500">
+                                                    <Building2 size={14} className="inline mr-2 text-slate-300" />
+                                                    {branches.find(b => b.id === item.branchId)?.name || 'Sin sede'}
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <span className={cn(
+                                                    "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                                                    item.active ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
+                                                )}>
+                                                    {item.active ? 'Activo' : 'Inactivo'}
+                                                </span>
+                                            </td>
+                                        </>
                                     )}
                                     <td className="px-8 py-6 text-right">
                                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
-                                                onClick={() => openModal(activeTab === 'BRANCHES' ? 'BRANCH' : 'DOCTOR', item)}
+                                                onClick={() => {
+                                                    const type = activeTab === 'BRANCHES' ? 'BRANCH' : (activeTab === 'DOCTORS' ? 'DOCTOR' : 'CONSULTORY');
+                                                    openModal(type, item);
+                                                }}
                                                 title="Editar"
                                                 className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-cyan-600 hover:border-cyan-200 transition-all"
                                             >
                                                 <Edit2 size={14} />
                                             </button>
                                             <button
-                                                onClick={() => handleToggleActive(activeTab === 'BRANCHES' ? 'BRANCH' : 'DOCTOR', item)}
+                                                onClick={() => {
+                                                    const type = activeTab === 'BRANCHES' ? 'BRANCH' : (activeTab === 'DOCTORS' ? 'DOCTOR' : 'CONSULTORY');
+                                                    handleDelete(type, item.id);
+                                                }}
                                                 title={item.active ? 'Desactivar' : 'Activar'}
                                                 className={cn(
                                                     "p-2 bg-white border rounded-lg transition-all",
@@ -296,11 +370,20 @@ const Management = () => {
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
                         <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg relative z-10 overflow-hidden border border-white/20">
                             <div className="p-8 border-b border-slate-100 flex justify-between items-center">
-                                <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{editingItem ? 'Editar' : 'Nuevo'} {activeTab === 'BRANCHES' ? 'Sede' : 'Médico'}</h2>
+                                <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+                                    {editingItem ? 'Editar' : 'Nuevo'} {activeTab === 'BRANCHES' ? 'Sede' : (activeTab === 'DOCTORS' ? 'Médico' : 'Consultorio')}
+                                </h2>
                                 <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-rose-500"><X size={24} /></button>
                             </div>
 
-                            <form onSubmit={activeTab === 'BRANCHES' ? handleSaveBranch : handleSaveDoctor} className="p-8 space-y-6">
+                            <form
+                                onSubmit={(e) => {
+                                    if (activeTab === 'BRANCHES') handleSaveBranch(e);
+                                    else if (activeTab === 'DOCTORS') handleSaveDoctor(e);
+                                    else handleSaveConsultory(e);
+                                }}
+                                className="p-8 space-y-6"
+                            >
                                 {activeTab === 'BRANCHES' ? (
                                     <>
                                         <div className="space-y-2">
@@ -316,7 +399,7 @@ const Management = () => {
                                             <input type="tel" value={branchForm.phone} onChange={e => setBranchForm({ ...branchForm, phone: e.target.value })} className="premium-input bg-slate-50" placeholder="Ej. +51 987 654 321" />
                                         </div>
                                     </>
-                                ) : (
+                                ) : activeTab === 'DOCTORS' ? (
                                     <>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Completo</label>
@@ -352,6 +435,22 @@ const Management = () => {
                                             </div>
                                         </div>
                                     </>
+                                ) : (
+                                    <>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre del Consultorio / Sillón</label>
+                                            <input required type="text" value={consultoryForm.name} onChange={e => setConsultoryForm({ ...consultoryForm, name: e.target.value })} className="premium-input bg-slate-50" placeholder="Ej. Sillón 01, Consultorio Dental A" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sede del Consultorio</label>
+                                            <select required value={consultoryForm.branchId} onChange={e => setConsultoryForm({ ...consultoryForm, branchId: e.target.value })} className="premium-input bg-slate-50">
+                                                <option value="">Seleccionar Sede...</option>
+                                                {branches.map(b => (
+                                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </>
                                 )}
 
                                 <div className="pt-6 flex gap-3">
@@ -365,7 +464,7 @@ const Management = () => {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 };
 

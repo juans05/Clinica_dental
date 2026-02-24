@@ -4,15 +4,11 @@ import {
     Calendar as CalendarIcon,
     Clock,
     Plus,
-    Filter,
     ChevronLeft,
     ChevronRight,
-    User,
     CheckCircle,
     XCircle,
-    MoreVertical,
     Search,
-    MapPin,
     AlertCircle
 } from 'lucide-react';
 import api from '../../services/api';
@@ -36,6 +32,8 @@ const Agenda = () => {
     const [branches, setBranches] = useState([]);
     const [selectedBranch, setSelectedBranch] = useState(null);
     const [selectedDoctor, setSelectedDoctor] = useState(null);
+    const [selectedConsultory, setSelectedConsultory] = useState(null);
+    const [consultories, setConsultories] = useState([]);
     const [searchPatient, setSearchPatient] = useState('');
     const [showPatientResults, setShowPatientResults] = useState(false);
 
@@ -44,6 +42,7 @@ const Agenda = () => {
         time: '08:00',
         patientId: '',
         doctorId: '',
+        consultoryId: '',
         reason: 'Primera visita',
         urgency: 'NORMAL',
         duration: '30',
@@ -57,7 +56,8 @@ const Agenda = () => {
         fetchDoctors();
         fetchPatients();
         fetchBranches();
-    }, [viewDate, viewMode, selectedBranch, selectedDoctor]);
+        fetchConsultories();
+    }, [viewDate, viewMode, selectedBranch, selectedDoctor, selectedConsultory]);
 
     const fetchAppointments = async () => {
         setLoading(true);
@@ -97,11 +97,12 @@ const Agenda = () => {
             const params = { start, end };
             if (selectedBranch) params.branchId = selectedBranch;
             if (selectedDoctor) params.doctorId = selectedDoctor;
+            if (selectedConsultory) params.consultoryId = selectedConsultory;
 
             const response = await api.get('appointments', {
                 params: params
             });
-            setAppointments(response.data);
+            setAppointments(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
             console.error('Error fetching appointments:', error);
         } finally {
@@ -124,7 +125,7 @@ const Agenda = () => {
     const fetchDoctors = async () => {
         try {
             const response = await api.get('auth/users?role=DENTIST');
-            setDoctors(response.data);
+            setDoctors(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
             if (user?.id) {
                 setDoctors([{ id: user.id, name: user.name, role: user.role || 'ADMIN' }]);
@@ -137,18 +138,29 @@ const Agenda = () => {
     const fetchPatients = async () => {
         try {
             const response = await api.get('patients');
-            setPatients(response.data);
+            setPatients(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
             console.error('Error fetching patients:', error);
+            setPatients([]);
         }
     };
 
     const fetchBranches = async () => {
         try {
             const response = await api.get('branches');
-            setBranches(response.data);
+            setBranches(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
             console.error('Error fetching branches:', error);
+            setBranches([]);
+        }
+    };
+
+    const fetchConsultories = async () => {
+        try {
+            const response = await api.get('consultories');
+            setConsultories(Array.isArray(response.data) ? response.data : []);
+        } catch (error) {
+            console.error('Error fetching consultories:', error);
         }
     };
 
@@ -169,7 +181,8 @@ const Agenda = () => {
                 urgency: formData.urgency,
                 duration: parseInt(formData.duration),
                 patientId: formData.patientId,
-                doctorId: formData.doctorId || user.id
+                doctorId: formData.doctorId || user.id,
+                consultoryId: formData.consultoryId
             });
 
             setShowModal(false);
@@ -290,6 +303,23 @@ const Agenda = () => {
                                     {doctors.map(d => (
                                         <option key={d.id} value={d.id}>{d.name}</option>
                                     ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Consultorio / Sillón</label>
+                                <select
+                                    value={selectedConsultory || ''}
+                                    onChange={(e) => setSelectedConsultory(e.target.value || null)}
+                                    className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-600 uppercase focus:ring-2 focus:ring-emerald-500 transition-all outline-none appearance-none cursor-pointer"
+                                >
+                                    <option value="">Todos los Sillones</option>
+                                    {consultories
+                                        .filter(c => !selectedBranch || c.branchId === selectedBranch)
+                                        .map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))
+                                    }
                                 </select>
                             </div>
                         </div>
@@ -616,6 +646,28 @@ const Agenda = () => {
                                     </select>
                                 </div>
 
+                                {/* Consultorio selector */}
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Consultorio / Sillón</label>
+                                    <select
+                                        value={formData.consultoryId}
+                                        onChange={e => setFormData({ ...formData, consultoryId: e.target.value })}
+                                        className="premium-input bg-slate-50/50"
+                                        required
+                                    >
+                                        <option value="">Seleccionar Sillón...</option>
+                                        {consultories
+                                            .filter(c => {
+                                                const doc = doctors.find(d => d.id === formData.doctorId);
+                                                return !doc?.branchId || c.branchId === doc.branchId;
+                                            })
+                                            .map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+
                                 {/* Motivo + Urgencia + Duración */}
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-3">
@@ -686,10 +738,10 @@ const Agenda = () => {
                                 </div>
                             </form>
                         </motion.div>
-                    </div>
+                    </div >
                 )}
-            </AnimatePresence>
-        </div>
+            </AnimatePresence >
+        </div >
     );
 };
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -76,6 +76,11 @@ const EXPERT_COLORS = {
 
 const getConditionData = (condId) => {
     if (typeof condId !== 'string' || !condId || condId === 'HEALTHY') return null;
+
+    // Handle Evolution States
+    if (condId === 'CURADO') return { label: 'Curado', color: '#22c55e', bg: '#22c55e15', status: 'GOOD' };
+    if (condId === 'PENDIENTE') return { label: 'Pendiente', color: '#facc15', bg: '#facc1515', status: 'NEUTRAL' };
+    if (condId === 'CANCELADO') return { label: 'Cancelado', color: '#ef4444', bg: '#ef444415', status: 'BAD' };
 
     // Check for status suffix for backward compatibility if needed, 
     // but preference is the expert list now
@@ -540,116 +545,54 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTooth, onMarkSurface, 
 };
 
 
-const FindingsPopover = ({ anchor, onClose, onSelect, currentFindings = [] }) => {
-    const [search, setSearch] = React.useState('');
-    const filtered = FINDINGS_LIST.filter(f =>
-        f.label.toLowerCase().includes(search.toLowerCase()) ||
-        f.id.toLowerCase().includes(search.toLowerCase())
-    );
 
-    const isActive = (id) => currentFindings.includes(id);
+const EvolutionPopover = ({ anchor, onClose, onSelect, currentState }) => {
+    const states = [
+        { id: 'CURADO', label: 'Curado', color: '#22c55e', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+        { id: 'PENDIENTE', label: 'Pendiente de curar', color: '#f59e0b', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+        { id: 'CANCELADO', label: 'Cancelado', color: '#94a3b8', bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
+    ];
 
     return (
         <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className={cn(
-                "fixed z-[100] w-72 rounded-2xl shadow-2xl border flex flex-col overflow-hidden bg-white border-slate-200"
-            )}
-            style={{
-                top: anchor.y,
-                left: anchor.x,
-                maxHeight: '400px'
-            }}
+            className="fixed z-[100] w-64 rounded-2xl shadow-2xl border bg-white border-slate-200 overflow-hidden"
+            style={{ top: anchor.y, left: anchor.x }}
         >
-            {/* Quick Tags */}
-            <div className="p-3 pb-0 flex flex-wrap gap-2">
-                <button
-                    onClick={() => onSelect(`CARIES_BAD`)}
-                    className={cn(
-                        "px-3 py-1.5 rounded-lg text-white text-[11px] font-black uppercase shadow-sm active:scale-95 transition-all",
-                        isActive('CARIES_BAD') ? "bg-red-700 ring-2 ring-red-400 ring-offset-1" : "bg-red-600"
-                    )}
-                >
-                    Caries
-                </button>
-                <button
-                    onClick={() => onSelect(`RESTORATION_GOOD`)}
-                    className={cn(
-                        "px-3 py-1.5 rounded-lg text-white text-[11px] font-black uppercase shadow-sm active:scale-95 transition-all",
-                        isActive('RESTORATION_GOOD') ? "bg-[#005a91] ring-2 ring-blue-300 ring-offset-1" : "bg-[#007cc3]"
-                    )}
-                >
-                    Restau
-                </button>
-                <button
-                    onClick={() => onSelect(`RESTORATION_BAD`)}
-                    className={cn(
-                        "px-3 py-1.5 rounded-lg text-white text-[11px] font-black uppercase shadow-sm active:scale-95 transition-all",
-                        isActive('RESTORATION_BAD') ? "bg-red-700 ring-2 ring-red-400 ring-offset-1" : "bg-red-600"
-                    )}
-                >
-                    Restau
-                </button>
+            <div className="p-4 bg-slate-50 border-b">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado de Evolución</h4>
             </div>
-
-            {/* Search */}
-            <div className="p-3 relative">
-                <Search size={14} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                    autoFocus
-                    type="text"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Buscar hallazgo"
-                    className="w-full pl-9 pr-4 py-2 rounded-xl text-xs font-bold outline-none border transition-all bg-slate-50 border-slate-100 text-slate-700 focus:border-indigo-300"
-                />
-            </div>
-
-            {/* List */}
-            <div className="flex-1 overflow-y-auto p-2 pt-0 space-y-1 custom-scrollbar">
-                {filtered.map(f => (
-                    <div key={f.id} className="flex items-center justify-between p-2 rounded-xl transition-colors hover:bg-slate-50 border border-transparent hover:border-slate-100">
-                        <span className="text-[11px] font-bold text-slate-500 max-w-[140px]">
-                            {f.label}
-                        </span>
-                        <div className="flex gap-1">
-                            {f.visual !== 'none' && (
-                                <>
-                                    <button
-                                        onClick={() => onSelect(`${f.id}_GOOD`)}
-                                        className={cn(
-                                            "h-10 w-12 rounded-xl border shadow-sm flex items-center justify-center transition-all",
-                                            isActive(`${f.id}_GOOD`)
-                                                ? "bg-blue-50 border-blue-400 shadow-inner"
-                                                : "bg-white border-slate-100 hover:border-blue-300 hover:shadow-md"
-                                        )}
-                                    >
-                                        <FindingIcon type={f.visual} color={isActive(`${f.id}_GOOD`) ? "#2563eb" : "#3b82f6"} />
-                                    </button>
-                                    <button
-                                        onClick={() => onSelect(`${f.id}_BAD`)}
-                                        className={cn(
-                                            "h-10 w-12 rounded-xl border shadow-sm flex items-center justify-center transition-all",
-                                            isActive(`${f.id}_BAD`)
-                                                ? "bg-red-50 border-red-400 shadow-inner"
-                                                : "bg-white border-slate-100 hover:border-red-300 hover:shadow-md"
-                                        )}
-                                    >
-                                        <FindingIcon type={f.visual} color={isActive(`${f.id}_BAD`) ? "#dc2626" : "#ef4444"} />
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
+            <div className="p-2 space-y-1">
+                {states.map(s => (
+                    <button
+                        key={s.id}
+                        onClick={() => onSelect(s.id)}
+                        className={cn(
+                            "w-full flex items-center gap-3 p-3 rounded-xl transition-all border",
+                            currentState === s.id
+                                ? `${s.bg} ${s.border} ${s.text} shadow-sm`
+                                : "bg-white border-transparent hover:bg-slate-50 text-slate-600"
+                        )}
+                    >
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} />
+                        <span className="text-xs font-bold">{s.label}</span>
+                    </button>
                 ))}
+                <button
+                    onClick={() => onSelect(null)}
+                    className="w-full h-10 flex items-center gap-3 px-3 rounded-xl transition-all border border-transparent hover:bg-red-50 group"
+                >
+                    <Trash2 size={14} className="text-red-300 group-hover:text-red-500" />
+                    <span className="text-xs font-bold text-red-400 group-hover:text-red-500">Quitar estado</span>
+                </button>
             </div>
         </motion.div>
     );
 };
 
-const ToothSVG = ({ number, data, isSelected, onTooth, onSurface }) => {
+const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIAL' }) => {
     const isUpperTooth = isUpper(number);
     const isMolarTooth = isMolar(number);
     const isPremolarTooth = isPremolar(number);
@@ -724,8 +667,14 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface }) => {
     return (
         <div className="flex flex-col items-center select-none group" title={tooltipText}>
             {/* Tooth Number Box */}
-            <div className="w-full bg-slate-100 py-1 mb-2 border-x border-slate-200 flex justify-center">
-                <span className="text-[11px] font-black text-slate-600">{number}</span>
+            <div className={cn(
+                "w-full py-1 mb-2 border-x flex justify-center transition-all",
+                data?.evolutionState === 'CURADO' ? "bg-green-500 border-green-600 text-white shadow-lg" :
+                    data?.evolutionState === 'PENDIENTE' ? "bg-amber-500 border-amber-600 text-white shadow-lg" :
+                        data?.evolutionState === 'CANCELADO' ? "bg-slate-400 border-slate-500 text-white shadow-lg" :
+                            "bg-slate-100 border-slate-200 text-slate-600"
+            )}>
+                <span className="text-[11px] font-black">{number}</span>
             </div>
 
             <svg
@@ -744,7 +693,8 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface }) => {
                 {/* Crown Border */}
                 <rect
                     x={padding} y={cY} width={cW} height={cH}
-                    fill="white" stroke={borderColor} strokeWidth={borderWidth}
+                    fill="white"
+                    stroke={borderColor} strokeWidth={borderWidth}
                 />
 
                 {missing || (data?.conditions || []).includes('MISSING') ? (
@@ -911,7 +861,10 @@ const Odontograma = ({ patientId }) => {
         markSurface,
         setNote,
         setIsTemporary,
-        setSelected
+        setSelected,
+        activeMode,
+        setActiveMode,
+        setEvolutionState
     } = useOdontogramStore();
 
     const { user } = useAuth();
@@ -920,7 +873,7 @@ const Odontograma = ({ patientId }) => {
 
     const [activeOdoTab, setActiveOdoTab] = React.useState('initial');
     const [saved, setSaved] = React.useState(false);
-    const [popover, setPopover] = React.useState(null);
+    const [evolutionPopover, setEvolutionPopover] = React.useState(null);
     const [detailTooth, setDetailTooth] = React.useState(null);
 
     React.useEffect(() => {
@@ -942,37 +895,118 @@ const Odontograma = ({ patientId }) => {
     );
 
     const onToothClick = (n, e) => {
-        setDetailTooth({ number: n, data: teeth[n] });
-        setSelected(n);
+        if (activeMode === 'EVOLUTION') {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setEvolutionPopover({
+                anchor: { x: rect.left, y: rect.top + rect.height + 5 },
+                number: n
+            });
+            setSelected(n);
+        } else {
+            setDetailTooth({ number: n, data: teeth[n] });
+            setSelected(n);
+        }
     };
 
     const onSurfaceClick = (n, s, e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = rect.right + 10 > window.innerWidth - 300 ? Math.max(10, rect.left - 300) : rect.right + 10;
-        setPopover({
-            anchor: { x, y: rect.top },
-            target: { type: 'surface', number: n, surface: s }
-        });
-        setSelected(n);
+        if (activeMode === 'EVOLUTION') {
+            onToothClick(n, e); // In evolution mode, surface click acts like tooth click
+            return;
+        }
+        // Redirect surface click to the main tooth detail modal as requested
+        onToothClick(n, e);
     };
 
-    const onFindingSelect = (findingId) => {
-        if (!popover) return;
-        markSurface(popover.target.number, popover.target.surface, findingId);
+
+    const handleEvolutionSelect = (state) => {
+        if (!evolutionPopover) return;
+        setEvolutionState(evolutionPopover.number, state);
+        setEvolutionPopover(null);
     };
 
-    const getCurrentFindings = () => {
-        if (!popover) return [];
-        const t = teeth[popover.target.number];
-        if (!t) return [];
-        if (popover.target.type === 'tooth') return t.conditions || [];
-        return t.surfaces[popover.target.surface] || [];
+    const handleExportPDF = () => {
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) {
+            import('jspdf').then(({ default: jsPDF }) => {
+                const doc = new jsPDF();
+                generatePDF(doc);
+            });
+        } else {
+            const doc = new jsPDF();
+            generatePDF(doc);
+        }
     };
+
+    const generatePDF = (doc) => {
+        doc.setFontSize(20);
+        doc.text('REPORTE DE ODONTOGRAMA', 105, 20, { align: 'center' });
+        doc.setFontSize(10);
+        doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 30);
+        doc.text(`Modo: ${activeMode === 'INITIAL' ? 'Inicial' : 'Evolución'}`, 20, 35);
+
+        // Simplified visual representation
+        let y = 50;
+        doc.text('REPRESENTACIÓN VISUAL (ESQUEMÁTICA)', 20, y);
+        y += 10;
+
+        const drawRow = (nums, rowY) => {
+            nums.forEach((n, i) => {
+                const tooth = teeth[n];
+                const x = 20 + (i * 12);
+                doc.setDrawColor(200);
+                doc.rect(x, rowY, 10, 15);
+                doc.setFontSize(6);
+                doc.text(n.toString(), x + 2, rowY + 5);
+
+                if (activeMode === 'EVOLUTION' && tooth.evolutionState) {
+                    const color = tooth.evolutionState === 'CURADO' ? [34, 197, 94] : (tooth.evolutionState === 'PENDIENTE' ? [245, 158, 11] : [148, 163, 184]);
+                    doc.setFillColor(color[0], color[1], color[2]);
+                    doc.rect(x + 1, rowY + 6, 8, 8, 'F');
+                } else if (tooth.conditions.length > 0) {
+                    doc.setFillColor(239, 68, 68);
+                    doc.rect(x + 1, rowY + 6, 8, 8, 'F');
+                }
+            });
+        };
+
+        drawRow(UPPER_RIGHT.concat(UPPER_LEFT), y);
+        drawRow(LOWER_RIGHT.concat(LOWER_LEFT), y + 25);
+
+        y += 60;
+        doc.setFontSize(12);
+        doc.text('DETALLE DE HALLAZGOS', 20, y);
+        y += 10;
+
+        const tableDataPDF = tableData.map(item => [
+            item.n,
+            getConditionData(item.cond)?.label || item.cond,
+            item.surface || 'Pieza',
+            item.notes || '-'
+        ]);
+
+        if (window.jspdf?.autoTable) {
+            window.jspdf.autoTable(doc, {
+                startY: y,
+                head: [['Diente', 'Hallazgo', 'Ubicación', 'Notas']],
+                body: tableDataPDF,
+                theme: 'grid'
+            });
+        } else {
+            tableDataPDF.forEach(row => {
+                doc.text(`${row[0]} - ${row[1]} (${row[2]})`, 20, y);
+                y += 7;
+            });
+        }
+
+        doc.save(`Odontograma_${patientId}_${activeMode}.pdf`);
+    };
+
 
     const renderRow = (nums, upper) => (
         <div className="flex gap-[1px]">
             {nums.map(n => (
                 <ToothSVG key={n} number={n} data={teeth[n]}
+                    mode={activeMode}
                     isSelected={selected === n}
                     onTooth={onToothClick} onSurface={onSurfaceClick} />
             ))}
@@ -983,6 +1017,12 @@ const Odontograma = ({ patientId }) => {
     const tableData = Object.entries(teeth).flatMap(([n, t]) => {
         const findings = [];
         if (!t) return findings;
+
+        // Add Evolution State if relevant
+        if (t.evolutionState && t.evolutionState !== 'NONE' && activeMode === 'EVOLUTION') {
+            findings.push({ n, type: 'EVOLUTION', cond: t.evolutionState, notes: t.notes });
+        }
+
         // Conditions (Tooth level)
         (t.conditions || []).forEach(cond => {
             findings.push({ n, type: 'TOOTH', cond, notes: t.notes });
@@ -997,15 +1037,15 @@ const Odontograma = ({ patientId }) => {
     });
 
     return (
-        <div className="bg-white min-h-screen p-1" onClick={() => popover && setPopover(null)}>
+        <div className="pt-2">
             <AnimatePresence>
-                {popover && (
+                {evolutionPopover && (
                     <div onClick={e => e.stopPropagation()}>
-                        <FindingsPopover
-                            anchor={popover.anchor}
-                            onClose={() => setPopover(null)}
-                            onSelect={onFindingSelect}
-                            currentFindings={getCurrentFindings()}
+                        <EvolutionPopover
+                            anchor={evolutionPopover.anchor}
+                            onClose={() => setEvolutionPopover(null)}
+                            currentState={teeth[evolutionPopover.number]?.evolutionState}
+                            onSelect={handleEvolutionSelect}
                         />
                     </div>
                 )}
@@ -1023,22 +1063,21 @@ const Odontograma = ({ patientId }) => {
             </AnimatePresence>
 
             {/* ── Top Tabs & Legend ── */}
-            <div className="flex items-center justify-between border-b border-slate-200 mb-6">
+            <div className="flex items-center justify-between border-b border-slate-200 mb-8">
                 <div className="flex gap-8 items-center">
                     {[
-                        { id: 'initial', label: 'Odo. Inicial' },
-                        { id: 'evolution', label: 'Odo. Evolución' },
-                        { id: 'high', label: 'Odo. Alta' }
+                        { id: 'INITIAL', label: 'Odo. Inicial' },
+                        { id: 'EVOLUTION', label: 'Odo. Evolución' }
                     ].map(tab => (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveOdoTab(tab.id)}
+                            onClick={() => setActiveMode(tab.id)}
                             className={cn(
                                 "pb-3 text-[13px] font-bold transition-all relative",
-                                activeOdoTab === tab.id ? "text-blue-600" : "text-slate-400"
+                                activeMode === tab.id ? "text-blue-600" : "text-slate-400"
                             )}>
                             {tab.label}
-                            {activeOdoTab === tab.id && <div className="absolute bottom-0 inset-x-0 h-1 bg-cyan-400" />}
+                            {activeMode === tab.id && <div className="absolute bottom-0 inset-x-0 h-1 bg-cyan-400" />}
                         </button>
                     ))}
 
@@ -1102,6 +1141,12 @@ const Odontograma = ({ patientId }) => {
                 >
                     <span className="text-blue-600 font-black">$</span> Crear presupuesto
                 </button>
+                <button
+                    onClick={handleExportPDF}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                    <ClipboardList size={14} /> Exportar PDF
+                </button>
                 <button className="p-2 text-slate-400 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                     <Info size={16} />
                 </button>
@@ -1150,8 +1195,8 @@ const Odontograma = ({ patientId }) => {
                         <thead className="bg-[#334e68] text-white">
                             <tr>
                                 <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">N° diente</th>
-                                <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">Hallazgo</th>
-                                <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">Servicios</th>
+                                <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">Hallazgo / Estado</th>
+                                <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">Servicios / Pago</th>
                                 <th className="px-6 py-4 text-[13px] font-bold">Nota</th>
                             </tr>
                         </thead>
@@ -1163,10 +1208,24 @@ const Odontograma = ({ patientId }) => {
                                         <td className="px-6 py-3 text-[12px] font-bold text-slate-600">{item.n} {item.surface ? `(${item.surface})` : ''}</td>
                                         <td className="px-6 py-3">
                                             <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider" style={{ backgroundColor: cond?.bg, color: cond?.color }}>
-                                                {cond?.label}
+                                                {cond?.label || item.cond}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-3 text-[12px] font-medium text-slate-500">—</td>
+                                        <td className="px-6 py-3 text-[12px] font-medium text-slate-500">
+                                            {item.cond === 'CURADO' ? (
+                                                <div className="flex items-center gap-3">
+                                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[9px] font-black uppercase">Por cobrar</span>
+                                                    <button
+                                                        onClick={() => navigate(`/expediente/${patientId}/budgets`)}
+                                                        className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-bold hover:bg-slate-800 transition-all flex items-center gap-1"
+                                                    >
+                                                        <Activity size={12} /> Facturar
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                '—'
+                                            )}
+                                        </td>
                                         <td className="px-6 py-3 text-[12px] font-medium text-slate-500 italic">{item.notes || 'Sin nota'}</td>
                                     </tr>
                                 );
@@ -1186,19 +1245,21 @@ const Odontograma = ({ patientId }) => {
             </div>
 
             {/* Float Save Button */}
-            {dirty && (
-                <div className="fixed bottom-8 right-8 z-[50]">
-                    <button
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            await handleSave();
-                        }}
-                        disabled={saving}
-                        className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl shadow-2xl hover:bg-blue-700 transition-all active:scale-95 font-black uppercase text-[12px] tracking-widest">
-                        {saving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}
-                    </button>
-                </div>
-            )}
+            {
+                dirty && (
+                    <div className="fixed bottom-8 right-8 z-[50]">
+                        <button
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                await handleSave();
+                            }}
+                            disabled={saving}
+                            className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl shadow-2xl hover:bg-blue-700 transition-all active:scale-95 font-black uppercase text-[12px] tracking-widest">
+                            {saving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}
+                        </button>
+                    </div>
+                )
+            }
         </div>
     );
 };
