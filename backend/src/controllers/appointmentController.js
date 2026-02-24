@@ -64,13 +64,58 @@ const createAppointment = async (req, res) => {
             return res.status(400).json({ message: 'Campos requeridos: fecha, paciente, doctor.' });
         }
 
+        const appointmentDate = new Date(date);
+        const appDuration = duration ? parseInt(duration) : 30;
+        const endTime = new Date(appointmentDate.getTime() + appDuration * 60000);
+
+        // Check for overlaps with the same doctor
+        const overlap = await prisma.appointment.findFirst({
+            where: {
+                doctorId: parseInt(doctorId),
+                branchId: parseInt(branchId),
+                status: { in: ['SCHEDULED', 'CONFIRMED'] },
+                OR: [
+                    {
+                        // New appointment starts during an existing one
+                        date: { lte: appointmentDate },
+                        // This logic assumes end time = date + duration
+                        // Since we don't store endTime explicitly, we calculate it on the fly or simplify
+                    }
+                ]
+            }
+        });
+
+        // Refined overlap check: 
+        // An overlap exists if: (startA < endB) AND (endA > startB)
+        const allPotentialOverlaps = await prisma.appointment.findMany({
+            where: {
+                doctorId: parseInt(doctorId),
+                branchId: parseInt(branchId),
+                status: { in: ['SCHEDULED', 'CONFIRMED'] },
+                date: {
+                    gte: new Date(appointmentDate.getTime() - 24 * 60 * 60 * 1000), // Check within 24h
+                    lte: new Date(appointmentDate.getTime() + 24 * 60 * 60 * 1000)
+                }
+            }
+        });
+
+        const isOverlapping = allPotentialOverlaps.some(app => {
+            const startB = new Date(app.date);
+            const endB = new Date(startB.getTime() + (app.duration || 30) * 60000);
+            return (appointmentDate < endB) && (endTime > startB);
+        });
+
+        if (isOverlapping) {
+            return res.status(409).json({ message: 'El doctor ya tiene una cita programada en este horario.' });
+        }
+
         const appointment = await prisma.appointment.create({
             data: {
-                date: new Date(date),
+                date: appointmentDate,
                 notes: notes || null,
                 reason: reason || null,
                 urgency: urgency || 'NORMAL',
-                duration: duration ? parseInt(duration) : 30,
+                duration: appDuration,
                 patientId: parseInt(patientId),
                 doctorId: parseInt(doctorId),
                 branchId: parseInt(branchId),
@@ -94,16 +139,52 @@ const updateAppointment = async (req, res) => {
         const { id } = req.params;
         const { date, notes, status, doctorId, reason, urgency, duration } = req.body;
 
+        const appointmentId = parseInt(id);
+        const existingApp = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+
+        if (!existingApp) {
+            return res.status(404).json({ message: 'Cita no encontrada' });
+        }
+
+        const newDate = date ? new Date(date) : new Date(existingApp.date);
+        const newDuration = duration ? parseInt(duration) : (existingApp.duration || 30);
+        const newDoctorId = doctorId ? parseInt(doctorId) : existingApp.doctorId;
+        const newEndTime = new Date(newDate.getTime() + newDuration * 60000);
+
+        // Check for overlaps (excluding current appointment)
+        const allPotentialOverlaps = await prisma.appointment.findMany({
+            where: {
+                id: { not: appointmentId },
+                doctorId: newDoctorId,
+                branchId: existingApp.branchId,
+                status: { in: ['SCHEDULED', 'CONFIRMED'] },
+                date: {
+                    gte: new Date(newDate.getTime() - 24 * 60 * 60 * 1000),
+                    lte: new Date(newDate.getTime() + 24 * 60 * 60 * 1000)
+                }
+            }
+        });
+
+        const isOverlapping = allPotentialOverlaps.some(app => {
+            const startB = new Date(app.date);
+            const endB = new Date(startB.getTime() + (app.duration || 30) * 60000);
+            return (newDate < endB) && (newEndTime > startB);
+        });
+
+        if (isOverlapping) {
+            return res.status(409).json({ message: 'El doctor ya tiene una cita programada en este horario.' });
+        }
+
         const appointment = await prisma.appointment.update({
-            where: { id: parseInt(id) },
+            where: { id: appointmentId },
             data: {
-                ...(date && { date: new Date(date) }),
+                ...(date && { date: newDate }),
                 ...(notes !== undefined && { notes }),
                 ...(status && { status }),
-                ...(doctorId && { doctorId: parseInt(doctorId) }),
+                ...(doctorId && { doctorId: newDoctorId }),
                 ...(reason !== undefined && { reason }),
                 ...(urgency && { urgency }),
-                ...(duration && { duration: parseInt(duration) }),
+                ...(duration && { duration: newDuration }),
                 updatedAt: new Date()
             }
         });

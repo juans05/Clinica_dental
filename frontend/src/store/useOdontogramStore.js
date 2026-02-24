@@ -45,6 +45,7 @@ const useOdontogramStore = create((set, get) => ({
                 Object.keys(backendData).forEach(n => {
                     if (mergedTeeth[n]) {
                         const raw = backendData[n];
+                        if (!raw) return;
 
                         // Normalización: Convertir strings antiguos a arreglos nuevos
                         const normConditions = (Array.isArray(raw.conditions) ? raw.conditions : [])
@@ -57,7 +58,7 @@ const useOdontogramStore = create((set, get) => ({
 
                         const normSurfaces = {};
                         ['O', 'V', 'L', 'M', 'D'].forEach(s => {
-                            const val = raw.surfaces ? raw.surfaces[s] : null;
+                            const val = raw?.surfaces ? raw.surfaces[s] : null;
                             normSurfaces[s] = (Array.isArray(val) ? val : [])
                                 .filter(c => typeof c === 'string' && c !== 'HEALTHY');
 
@@ -71,7 +72,7 @@ const useOdontogramStore = create((set, get) => ({
                             ...mergedTeeth[n],
                             conditions: normConditions,
                             surfaces: normSurfaces,
-                            notes: raw.notes || ''
+                            notes: raw?.notes || ''
                         };
                     }
                 });

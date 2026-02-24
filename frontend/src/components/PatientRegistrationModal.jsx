@@ -6,7 +6,8 @@ import { twMerge } from 'tailwind-merge';
 
 const cn = (...inputs) => twMerge(clsx(inputs));
 
-const PatientRegistrationModal = ({ isOpen, onClose, onSave }) => {
+const PatientRegistrationModal = ({ isOpen, onClose, onSave, editData = null }) => {
+    const isEdit = !!editData;
     const [step, setStep] = useState(1);
     const [showOptional, setShowOptional] = useState(true);
     const [showTagsPopover, setShowTagsPopover] = useState(false);
@@ -46,8 +47,42 @@ const PatientRegistrationModal = ({ isOpen, onClose, onSave }) => {
 
     // Reset state whenever the modal opens
     useEffect(() => {
-        if (isOpen) {
-            setStep(1);
+        if (!isOpen) return;
+
+        if (isEdit && editData) {
+            setFormData({
+                documentType: editData.documentType || 'DNI',
+                documentId: editData.documentId || '',
+                noDocument: !editData.documentId,
+                firstName: editData.firstName || '',
+                paternalSurname: editData.paternalSurname || '',
+                maternalSurname: editData.maternalSurname || '',
+                phoneMobile: editData.phoneMobile?.replace('+51 ', '') || '',
+                noPhone: !editData.phoneMobile,
+                hasGuardian: !!editData.hasGuardian,
+                email: editData.email || '',
+                birthDate: editData.birthDate ? new Date(editData.birthDate).toISOString().split('T')[0] : '',
+                gender: editData.gender || 'Hombre',
+                leadSource: editData.leadSource || '',
+                insurance: editData.insurance || '',
+                tags: typeof editData.tags === 'string' ? editData.tags.split(',').filter(Boolean) : (Array.isArray(editData.tags) ? editData.tags : [])
+            });
+            if (editData.hasGuardian) {
+                setGuardianData({
+                    relation: editData.guardianRelation || 'Papá',
+                    email: editData.guardianEmail || '',
+                    documentType: editData.guardianDocumentType || 'DNI',
+                    documentId: editData.guardianDocumentId || '',
+                    noDocument: !editData.guardianDocumentId,
+                    firstName: editData.guardianName?.split(' ')[0] || '',
+                    paternalSurname: editData.guardianName?.split(' ')[1] || '',
+                    maternalSurname: editData.guardianName?.split(' ')[2] || '',
+                    phoneMobile: editData.guardianPhone?.replace('+51 ', '') || '',
+                    noPhone: !editData.guardianPhone,
+                    address: editData.guardianAddress || ''
+                });
+            }
+        } else {
             setFormData({
                 documentType: 'DNI',
                 documentId: '',
@@ -78,10 +113,11 @@ const PatientRegistrationModal = ({ isOpen, onClose, onSave }) => {
                 noPhone: false,
                 address: ''
             });
-            setIsSaving(false);
-            setShowOptional(true);
-            setShowTagsPopover(false);
         }
+        setStep(1);
+        setIsSaving(false);
+        setShowOptional(true);
+        setShowTagsPopover(false);
     }, [isOpen]);
 
     const handleSave = async (e) => {
@@ -103,13 +139,21 @@ const PatientRegistrationModal = ({ isOpen, onClose, onSave }) => {
         }
     };
 
-    const toggleTag = (tag) => {
-        setFormData(prev => ({
-            ...prev,
-            tags: prev.tags.includes(tag)
-                ? prev.tags.filter(t => t !== tag)
-                : [...prev.tags, tag]
-        }));
+    const toggleTag = (tag, e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        setFormData(prev => {
+            const currentTags = Array.isArray(prev.tags) ? prev.tags : [];
+            const isSelected = currentTags.includes(tag);
+            return {
+                ...prev,
+                tags: isSelected
+                    ? currentTags.filter(t => t !== tag)
+                    : [...currentTags, tag]
+            };
+        });
     };
 
     const TAG_OPTIONS = [
@@ -185,7 +229,7 @@ const PatientRegistrationModal = ({ isOpen, onClose, onSave }) => {
                                     </div>
                                 </div>
                             ) : (
-                                <h2 className="text-[16px] font-black text-slate-600 uppercase tracking-widest">Crear nuevo paciente</h2>
+                                <h2 className="text-[16px] font-black text-slate-600 uppercase tracking-widest">{isEdit ? 'Editar Paciente' : 'Crear nuevo paciente'}</h2>
                             )}
 
                             <div className="flex-1 flex justify-end">
@@ -427,14 +471,42 @@ const PatientRegistrationModal = ({ isOpen, onClose, onSave }) => {
                                                 <div className="pt-0 grid grid-cols-[100px_1fr] items-center gap-3">
                                                     <span className="text-[12px] text-slate-500 font-bold">Etiquetas</span>
                                                     <div className="relative">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowTagsPopover(!showTagsPopover)}
-                                                            className="flex items-center gap-1.5 text-[14px] text-[#00aeb5] font-bold"
-                                                        >
-                                                            <Plus size={18} className="border border-[#00aeb5] rounded-full p-0.5" />
-                                                            <span>Etiquetas</span>
-                                                        </button>
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    setShowTagsPopover(!showTagsPopover);
+                                                                }}
+                                                                className="flex items-center gap-1.5 text-[14px] text-[#00aeb5] font-bold shrink-0"
+                                                            >
+                                                                <Plus size={18} className="border border-[#00aeb5] rounded-full p-0.5" />
+                                                                <span>Etiquetas</span>
+                                                            </button>
+
+                                                            {/* Selected Tags Display */}
+                                                            {formData.tags && formData.tags.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1.5">
+                                                                    {formData.tags.map(tagName => {
+                                                                        const tagOpt = TAG_OPTIONS.find(t => t.name === tagName);
+                                                                        return (
+                                                                            <span
+                                                                                key={tagName}
+                                                                                className={cn(
+                                                                                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                                                                                    tagOpt?.bg || "bg-slate-100",
+                                                                                    tagOpt?.text || "text-slate-500",
+                                                                                    tagOpt ? "border-transparent" : "border-slate-200"
+                                                                                )}
+                                                                            >
+                                                                                {tagName}
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
 
                                                         {/* Tags Popover */}
                                                         <AnimatePresence>
@@ -455,15 +527,20 @@ const PatientRegistrationModal = ({ isOpen, onClose, onSave }) => {
                                                                                 <button
                                                                                     key={tag.name}
                                                                                     type="button"
-                                                                                    onClick={() => toggleTag(tag.name)}
+                                                                                    onClick={(e) => toggleTag(tag.name, e)}
                                                                                     className={cn(
                                                                                         "px-4 py-1.5 rounded-full text-[14px] font-medium transition-all border",
                                                                                         tag.bg,
                                                                                         tag.text,
-                                                                                        formData.tags.includes(tag.name) ? "ring-2 ring-offset-1 ring-slate-200" : "border-transparent"
+                                                                                        formData.tags && Array.isArray(formData.tags) && formData.tags.includes(tag.name)
+                                                                                            ? "ring-2 ring-offset-2 ring-[#00aeb5] border-[#00aeb5] shadow-sm scale-105"
+                                                                                            : "border-transparent opacity-70 hover:opacity-100"
                                                                                     )}
                                                                                 >
-                                                                                    {tag.name}
+                                                                                    <span className="flex items-center gap-1.5">
+                                                                                        {formData.tags && Array.isArray(formData.tags) && formData.tags.includes(tag.name) && <Check size={12} />}
+                                                                                        {tag.name}
+                                                                                    </span>
                                                                                 </button>
                                                                             ))}
                                                                         </div>
@@ -647,7 +724,7 @@ const PatientRegistrationModal = ({ isOpen, onClose, onSave }) => {
                                     disabled={isSaving}
                                     className="px-10 py-2 bg-[#00aeb5] text-white font-black text-[13px] uppercase tracking-widest rounded-xl hover:bg-[#009ca3] transition-all flex items-center gap-2"
                                 >
-                                    <span>{isSaving ? (step === 1 && formData.hasGuardian ? 'Siguiente...' : 'Creando...') : (step === 1 && formData.hasGuardian ? 'Continuar' : 'Crear')}</span>
+                                    <span>{isSaving ? (step === 1 && formData.hasGuardian ? 'Siguiente...' : 'Guardando...') : (step === 1 && formData.hasGuardian ? 'Continuar' : (isEdit ? 'Actualizar' : 'Crear'))}</span>
                                     {step === 1 && formData.hasGuardian && <ChevronDown size={16} className="-rotate-90" />}
                                 </button>
 

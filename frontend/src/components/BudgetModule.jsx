@@ -119,7 +119,7 @@ const BudgetModule = ({ patientId, patientName }) => {
             `S/ ${(i.price * i.quantity * (1 - (i.discount || 0) / 100)).toFixed(2)}`
         ]);
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 45,
             head: [['Servicio', 'Diente', 'Cant.', 'Precio', 'Subtotal']],
             body: tableData,

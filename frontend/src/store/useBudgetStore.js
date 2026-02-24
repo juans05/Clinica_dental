@@ -115,12 +115,10 @@ const useBudgetStore = create((set, get) => ({
     },
 
     syncToothToBudget: async (patientId, doctorId, toothNumber, toothData) => {
+        // ... (lógica existente mantenida)
         const { services, budgets } = get();
         const items = [];
-
-        // Find a pending budget for this patient
         let targetBudget = budgets.find(b => b.status === 'PENDING' && b.patientId === parseInt(patientId));
-
         const processFinding = (condId, surface = null) => {
             const service = findServiceForCondition(condId, services);
             if (service) {
@@ -132,14 +130,11 @@ const useBudgetStore = create((set, get) => ({
                 });
             }
         };
-
         (toothData.conditions || []).forEach(c => processFinding(c));
         Object.entries(toothData.surfaces || {}).forEach(([s, conds]) => {
             (conds || []).forEach(c => processFinding(c, s));
         });
-
         if (items.length === 0) return { success: false, message: 'No hay hallazgos que requieran tratamiento.' };
-
         try {
             if (targetBudget) {
                 for (const item of items) {
@@ -161,6 +156,42 @@ const useBudgetStore = create((set, get) => ({
         } catch (e) {
             console.error('Error syncing tooth:', e);
             return { success: false, message: 'Error en la sincronización.' };
+        }
+    },
+
+    createBudget: async (patientId, doctorId, items) => {
+        try {
+            const r = await api.post('treatments', {
+                patientId,
+                doctorId,
+                items,
+                notes: 'Presupuesto creado manualmente.'
+            });
+            set(state => ({ budgets: [r.data, ...state.budgets] }));
+            return r.data;
+        } catch (e) {
+            console.error('Error creating budget:', e);
+            return null;
+        }
+    },
+
+    registerPayment: async (paymentData) => {
+        try {
+            const r = await api.post('billing/payments', paymentData);
+            return r.data;
+        } catch (e) {
+            console.error('Error registering payment:', e);
+            return null;
+        }
+    },
+
+    createInvoice: async (invoiceData) => {
+        try {
+            const r = await api.post('billing/invoices', invoiceData);
+            return r.data;
+        } catch (e) {
+            console.error('Error creating invoice:', e);
+            return null;
         }
     }
 }));

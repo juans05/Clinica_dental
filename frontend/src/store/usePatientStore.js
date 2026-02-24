@@ -71,11 +71,12 @@ const usePatientStore = create((set, get) => ({
         const { formData, patient } = get();
         try {
             if (!patient.id) {
-                await api.post('patients', formData);
+                const res = await api.post('patients', formData);
+                set({ patient: res.data, formData: res.data, isEditing: false });
                 alert('Paciente registrado exitosamente');
             } else {
                 await api.put(`patients/${patient.id}`, formData);
-                set({ patient: formData, isEditing: false });
+                set({ patient: { ...formData }, isEditing: false });
             }
             if (onSuccess) onSuccess();
         } catch (e) {

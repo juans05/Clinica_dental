@@ -36,6 +36,9 @@ const Patients = () => {
     const [loading, setLoading] = useState(true);
     const [showRegistrationModal, setShowRegistrationModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isEditing, setIsEditing] = useState(false);
+    const [selectedId, setSelectedId] = useState(null);
+    const [viewMode, setViewMode] = useState('list');
 
     const initialFormState = {
         documentType: 'DNI',
@@ -58,7 +61,8 @@ const Patients = () => {
         ubigeoCode: '0',
         address: '',
         reference: '',
-        medicalHistory: ''
+        medicalHistory: '',
+        tags: []
     };
 
     const [formData, setFormData] = useState(initialFormState);
@@ -99,8 +103,11 @@ const Patients = () => {
         });
     };
 
-    const handleEdit = (patient, targetModule = 'filiation') => {
-        navigate(`/expediente/${patient.id}/${targetModule}`);
+    const handleEdit = (patient) => {
+        setFormData(patient);
+        setIsEditing(true);
+        setSelectedId(patient.id);
+        setShowRegistrationModal(true);
     };
 
     const handleDelete = async (id) => {
@@ -274,7 +281,7 @@ const Patients = () => {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: i * 0.05 }}
-                                            onClick={() => handleEdit(p, 'filiation')}
+                                            onClick={() => navigate(`/expediente/${p.id}/filiation`)}
                                             className="hover:bg-slate-50/50 transition-all group cursor-pointer"
                                         >
                                             <td className="px-8 py-6">
@@ -358,7 +365,12 @@ const Patients = () => {
             {/* High-Fidelity Registration Modal */}
             <PatientRegistrationModal
                 isOpen={showRegistrationModal}
-                onClose={() => setShowRegistrationModal(false)}
+                onClose={() => {
+                    setShowRegistrationModal(false);
+                    setSelectedId(null);
+                    setIsEditing(false);
+                }}
+                editData={isEditing ? formData : null}
                 onSave={async (data) => {
                     try {
                         const lastName = `${data.paternalSurname || ''} ${data.maternalSurname || ''}`.trim();
@@ -385,7 +397,15 @@ const Patients = () => {
                             delete payload.guardian;
                         }
 
-                        await api.post('patients', payload);
+                        if (isEditing) {
+                            await api.put(`patients/${selectedId}`, payload);
+                        } else {
+                            await api.post('patients', payload);
+                        }
+
+                        setShowRegistrationModal(false);
+                        setSelectedId(null);
+                        setIsEditing(false);
                         fetchPatients();
                     } catch (error) {
                         console.error('Error creating patient:', error);

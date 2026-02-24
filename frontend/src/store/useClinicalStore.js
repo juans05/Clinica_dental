@@ -28,6 +28,20 @@ const useClinicalStore = create((set, get) => ({
                 }
             }));
         } catch (e) {
+            // Manejar específicamente el caso de que no exista el formulario (404)
+            if (e.response?.status === 404) {
+                set((state) => ({
+                    forms: {
+                        ...state.forms,
+                        [type]: {
+                            data: {},
+                            status: 'success'
+                        }
+                    }
+                }));
+                return;
+            }
+
             console.error(`Error fetching form ${type}:`, e);
             set((state) => ({
                 forms: {
@@ -50,7 +64,7 @@ const useClinicalStore = create((set, get) => ({
 
     saveForm: async (patientId, type) => {
         const form = get().forms[type];
-        if (!form) return;
+        if (!form || !form.data) return;
 
         set({ saving: true });
         try {
@@ -60,11 +74,12 @@ const useClinicalStore = create((set, get) => ({
                 data: form.data
             });
             set({ saving: false });
-            // Optional: alert or toast
+            return true;
         } catch (e) {
             console.error(`Error saving form ${type}:`, e);
             set({ saving: false });
             alert('Error al guardar el formulario');
+            return false;
         }
     }
 }));

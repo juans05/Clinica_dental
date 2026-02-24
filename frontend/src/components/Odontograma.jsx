@@ -982,6 +982,7 @@ const Odontograma = ({ patientId }) => {
     // Filter findings for the table
     const tableData = Object.entries(teeth).flatMap(([n, t]) => {
         const findings = [];
+        if (!t) return findings;
         // Conditions (Tooth level)
         (t.conditions || []).forEach(cond => {
             findings.push({ n, type: 'TOOTH', cond, notes: t.notes });
@@ -1089,7 +1090,7 @@ const Odontograma = ({ patientId }) => {
                 <button
                     onClick={async () => {
                         if (window.confirm('¿Deseas generar un presupuesto automático basado en los hallazgos actuales?')) {
-                            const budget = await createBudgetFromOdontogram(patientId, user.id, teeth);
+                            const budget = await createBudgetFromOdontogram(patientId, user?.id, teeth);
                             if (budget) {
                                 navigate(`/expediente/${patientId}/budgets`);
                             } else {
@@ -1188,7 +1189,10 @@ const Odontograma = ({ patientId }) => {
             {dirty && (
                 <div className="fixed bottom-8 right-8 z-[50]">
                     <button
-                        onClick={handleSave}
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            await handleSave();
+                        }}
                         disabled={saving}
                         className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl shadow-2xl hover:bg-blue-700 transition-all active:scale-95 font-black uppercase text-[12px] tracking-widest">
                         {saving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}

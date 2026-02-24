@@ -7,24 +7,27 @@ exports.saveForm = async (req, res) => {
     const { patientId, type, data } = req.body;
     const doctorId = req.user.id;
 
+    const pId = parseInt(patientId);
+    const dId = parseInt(doctorId);
+
     try {
         const form = await prisma.clinicalForm.upsert({
             where: {
                 patientId_type: {
-                    patientId: parseInt(patientId),
+                    patientId: pId,
                     type: type
                 }
             },
             update: {
                 data: data,
-                doctorId: doctorId,
+                doctor: { connect: { id: dId } },
                 updatedAt: new Date()
             },
             create: {
-                patientId: parseInt(patientId),
+                patient: { connect: { id: pId } },
+                doctor: { connect: { id: dId } },
                 type: type,
-                data: data,
-                doctorId: doctorId
+                data: data
             }
         });
 

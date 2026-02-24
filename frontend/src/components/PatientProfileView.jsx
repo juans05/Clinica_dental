@@ -44,6 +44,33 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
         navigate(`/expediente/${patientId}/${mod}`);
     };
 
+    const {
+        activeTab,
+        setActiveTab,
+        activeHistoryTab,
+        setActiveHistoryTab
+    } = usePatientStore();
+
+    const autoSelectRef = React.useRef(null);
+
+    // Auto-select anamnesis tab based on age when entering history module
+    useEffect(() => {
+        const entryKey = `${patient?.id}-${activeModule}`;
+        if (patient && patient.birthDate && activeModule === 'history' && autoSelectRef.current !== entryKey) {
+            const birth = new Date(patient.birthDate);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+
+            const targetTab = age < 18 ? 'child' : 'adult';
+            setActiveHistoryTab(targetTab);
+            autoSelectRef.current = entryKey;
+        } else if (activeModule !== 'history') {
+            autoSelectRef.current = null;
+        }
+    }, [patient?.id, activeModule, setActiveHistoryTab]);
+
     const calculateAge = (birthDate) => {
         if (!birthDate) return '—';
         const birth = new Date(birthDate);
@@ -51,15 +78,10 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
         let age = today.getFullYear() - birth.getFullYear();
         const m = today.getMonth() - birth.getMonth();
         if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-        return `${age} años`;
+        return age; // Cambiado a devolver número para facilitar cálculos
     };
 
-    const {
-        activeTab,
-        setActiveTab,
-        activeHistoryTab,
-        setActiveHistoryTab
-    } = usePatientStore();
+    const patientAge = patient?.birthDate ? calculateAge(patient.birthDate) : null;
 
     if (loading) return (
         <div className="flex-1 flex flex-col items-center justify-center min-h-[400px] gap-6 bg-slate-50/50 rounded-[40px] border border-slate-100">
@@ -128,7 +150,7 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
                         {patient.firstName} {patient.paternalSurname}
                     </h2>
                     <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest text-[10px]">
-                        {calculateAge(patient.birthDate)} · HC {patient.hcNumber || 'N/A'}
+                        {patient.birthDate ? `${calculateAge(patient.birthDate)} años` : '—'} · HC {patient.hcNumber || 'N/A'}
                     </p>
                     <p className="text-xs font-medium text-slate-300 mt-0.5 italic">
                         Creado el {new Date(patient.createdAt).toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -473,10 +495,15 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
                             {/* Internal Tabs for Clinical History */}
                             <div className="px-8 pt-6 flex gap-8 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-20">
                                 {[
-                                    { id: 'adult', label: 'Anam. Adulto', icon: Stethoscope },
-                                    { id: 'child', label: 'Anam. Niño', icon: Baby },
-                                    { id: 'endo', label: 'Endodoncia', icon: Activity }
-                                ].map(tab => (
+                                    { id: 'adult', label: 'Anam. Adulto', icon: Stethoscope, minAge: 18 },
+                                    { id: 'child', label: 'Anam. Niño', icon: Baby, maxAge: 17 },
+                                    { id: 'endo', label: 'Endodoncia', icon: Activity, minAge: 18 }
+                                ].filter(tab => {
+                                    if (patientAge === null) return true;
+                                    if (tab.minAge && patientAge < tab.minAge) return false;
+                                    if (tab.maxAge && patientAge > tab.maxAge) return false;
+                                    return true;
+                                }).map(tab => (
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveHistoryTab(tab.id)}

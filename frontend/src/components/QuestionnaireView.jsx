@@ -11,10 +11,10 @@ const cn = (...inputs) => twMerge(clsx(inputs));
 
 // ── Sub-components ──
 
-const Section = ({ id, title, icon: Icon, children, className, type, openSections, setOpenSections }) => {
-    const isOpen = type !== 'ENDODONTICS' || openSections.has(id);
+const Section = ({ id, title, icon: Icon, children, className, formType, openSections, setOpenSections }) => {
+    const isOpen = formType !== 'ENDODONTICS' || openSections.has(id);
     const toggle = () => {
-        if (type !== 'ENDODONTICS') return;
+        if (formType !== 'ENDODONTICS') return;
         const next = new Set(openSections);
         if (next.has(id)) next.delete(id);
         else next.add(id);
@@ -25,16 +25,16 @@ const Section = ({ id, title, icon: Icon, children, className, type, openSection
         <div className={cn("bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden transition-all", className)}>
             <button
                 onClick={toggle}
-                disabled={type !== 'ENDODONTICS'}
+                disabled={formType !== 'ENDODONTICS'}
                 className={cn(
                     "flex items-center justify-between px-4 py-3 border-b border-slate-50 transition-colors text-left w-full",
-                    type === 'ENDODONTICS' ? "hover:bg-slate-50 cursor-pointer" : ""
+                    formType === 'ENDODONTICS' ? "hover:bg-slate-50 cursor-pointer" : ""
                 )}
             >
                 <h3 className="flex items-center gap-2 text-[11px] font-black text-slate-800 uppercase tracking-widest">
                     <Icon size={12} className="text-indigo-500" /> {title}
                 </h3>
-                {type === 'ENDODONTICS' && (
+                {formType === 'ENDODONTICS' && (
                     <div className={cn("transition-transform duration-300", isOpen ? "rotate-180" : "")}>
                         <Plus size={14} className="text-slate-400" />
                     </div>
@@ -49,13 +49,13 @@ const Section = ({ id, title, icon: Icon, children, className, type, openSection
     );
 };
 
-const Field = ({ label, name, placeholder, type: inputType = "text", size = "normal", formData, updateFormData, type }) => (
+const Field = ({ label, name, placeholder, type: inputType = "text", size = "normal", formData, updateFormData, formType }) => (
     <div className={cn("flex flex-col gap-1", size === "full" ? "md:col-span-2 lg:col-span-3" : "")}>
         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
         {inputType === "textarea" ? (
             <textarea
                 value={formData[name] || ''}
-                onChange={e => updateFormData(type, name, e.target.value)}
+                onChange={e => updateFormData(formType, name, e.target.value)}
                 placeholder={placeholder}
                 className="w-full bg-slate-50/50 border border-slate-100 focus:border-indigo-300 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none transition-all min-h-[80px] resize-none"
             />
@@ -63,7 +63,7 @@ const Field = ({ label, name, placeholder, type: inputType = "text", size = "nor
             <input
                 type={inputType}
                 value={formData[name] || ''}
-                onChange={e => updateFormData(type, name, e.target.value)}
+                onChange={e => updateFormData(formType, name, e.target.value)}
                 placeholder={placeholder}
                 className="w-full bg-slate-50/50 border border-slate-100 focus:border-indigo-300 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none transition-all"
             />
@@ -71,7 +71,7 @@ const Field = ({ label, name, placeholder, type: inputType = "text", size = "nor
     </div>
 );
 
-const ToggleGroup = ({ label, name, options = ["No", "Si"], formData, updateFormData, type }) => (
+const ToggleGroup = ({ label, name, options = ["No", "Si"], formData, updateFormData, formType }) => (
     <div className="flex items-center justify-between p-2 bg-slate-50/50 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors">
         <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">{label}</span>
         <div className="flex gap-1 bg-white p-0.5 rounded-md border border-slate-100">
@@ -80,7 +80,7 @@ const ToggleGroup = ({ label, name, options = ["No", "Si"], formData, updateForm
                 return (
                     <button
                         key={opt}
-                        onClick={() => updateFormData(type, name, opt)}
+                        onClick={() => updateFormData(formType, name, opt)}
                         className={cn(
                             "px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all min-w-[32px]",
                             active ? "bg-indigo-500 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
@@ -94,14 +94,14 @@ const ToggleGroup = ({ label, name, options = ["No", "Si"], formData, updateForm
     </div>
 );
 
-const CheckboxGroup = ({ label, items = [], className, formData, updateFormData, type }) => (
+const CheckboxGroup = ({ label, items = [], className, formData, updateFormData, formType }) => (
     <div className={cn("md:col-span-2 lg:col-span-3 space-y-2 pb-2", className)}>
         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
         <div className="flex flex-wrap gap-2">
             {items.map(item => (
                 <button
                     key={item.id}
-                    onClick={() => updateFormData(type, item.id, !formData[item.id])}
+                    onClick={() => updateFormData(formType, item.id, !formData[item.id])}
                     className={cn(
                         "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-bold uppercase",
                         formData[item.id]
@@ -122,12 +122,12 @@ const CheckboxGroup = ({ label, items = [], className, formData, updateFormData,
     </div>
 );
 
-const SelectField = ({ label, name, options = [], formData, updateFormData, type }) => (
+const SelectField = ({ label, name, options = [], formData, updateFormData, formType }) => (
     <div className="flex flex-col gap-1">
         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
         <select
             value={formData[name] || ''}
-            onChange={e => updateFormData(type, name, e.target.value)}
+            onChange={e => updateFormData(formType, name, e.target.value)}
             className="w-full bg-slate-50/50 border border-slate-100 focus:border-indigo-300 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none transition-all"
         >
             <option value="">Seleccionar</option>
@@ -138,7 +138,7 @@ const SelectField = ({ label, name, options = [], formData, updateFormData, type
     </div>
 );
 
-const ToggleField = ({ label, name, detailName, formData, updateFormData, type }) => (
+const ToggleField = ({ label, name, detailName, formData, updateFormData, formType }) => (
     <div className="flex items-center gap-4 p-2 bg-slate-50/50 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors md:col-span-2 lg:col-span-3">
         <div className="flex-1">
             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">{label}</span>
@@ -149,7 +149,7 @@ const ToggleField = ({ label, name, detailName, formData, updateFormData, type }
                 return (
                     <button
                         key={opt}
-                        onClick={() => updateFormData(type, name, opt)}
+                        onClick={() => updateFormData(formType, name, opt)}
                         className={cn(
                             "px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all min-w-[32px]",
                             active ? "bg-indigo-500 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
@@ -163,15 +163,16 @@ const ToggleField = ({ label, name, detailName, formData, updateFormData, type }
         <input
             type="text"
             value={formData[detailName] || ''}
-            onChange={e => updateFormData(type, detailName, e.target.value)}
+            onChange={e => updateFormData(formType, detailName, e.target.value)}
             placeholder="Especificar detalladamente..."
             className="flex-1 bg-white border border-slate-100 focus:border-indigo-300 rounded-lg px-3 py-1 text-xs font-bold text-slate-700 outline-none transition-all"
         />
     </div>
 );
 
-const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
+const QuestionnaireView = ({ patientId, type: formType, onSaveSuccess }) => {
     const [openSections, setOpenSections] = React.useState(new Set(['initial', 'ped_initial', 'ped_illness', 'ped_pre']));
+    const [saveStatus, setSaveStatus] = React.useState('idle'); // 'idle' | 'success' | 'error'
     const {
         forms,
         fetchForm,
@@ -181,12 +182,12 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
     } = useClinicalStore();
 
     useEffect(() => {
-        if (patientId && type) {
-            fetchForm(patientId, type);
+        if (patientId && formType) {
+            fetchForm(patientId, formType);
         }
-    }, [patientId, type, fetchForm]);
+    }, [patientId, formType, fetchForm]);
 
-    const form = forms[type] || { data: {}, status: 'idle' };
+    const form = forms[formType] || { data: {}, status: 'idle' };
     const formData = form.data || {};
 
     if (form.status === 'loading') return (
@@ -196,8 +197,8 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
         </div>
     );
 
-    const commonProps = { formData, updateFormData, type };
-    const sectionProps = { type, openSections, setOpenSections };
+    const commonProps = { formData, updateFormData, formType };
+    const sectionProps = { formType, openSections, setOpenSections };
 
     return (
         <div className="flex-col h-full bg-white flex relative overflow-hidden">
@@ -209,8 +210,8 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
                     </div>
                     <div>
                         <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">
-                            {type === 'ADULT_ANAMNESIS' ? 'Anamnesis Adulto' :
-                                type === 'PED_ANAMNESIS' ? 'Anamnesis Niños' :
+                            {formType === 'ADULT_ANAMNESIS' ? 'Anamnesis Adulto' :
+                                formType === 'PED_ANAMNESIS' ? 'Anamnesis Niños' :
                                     'Evaluación Endodóntica'}
                         </h2>
                         <p className="text-[10px] font-bold text-slate-400">Expediente Clínico Digital</p>
@@ -220,17 +221,34 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={async () => {
-                            await saveForm(patientId, type);
-                            if (onSaveSuccess) onSaveSuccess();
+                            const success = await saveForm(patientId, formType);
+                            if (success) {
+                                if (onSaveSuccess) onSaveSuccess();
+                                // Feedback visual temporal
+                                setSaveStatus('success');
+                                setTimeout(() => setSaveStatus('idle'), 3000);
+                            } else {
+                                setSaveStatus('error');
+                                setTimeout(() => setSaveStatus('idle'), 3000);
+                            }
                         }}
                         disabled={saving}
                         className={cn(
-                            "px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2",
+                            "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center gap-2",
+                            saveStatus === 'success' ? "bg-emerald-500 text-white shadow-emerald-500/30" :
+                                saveStatus === 'error' ? "bg-rose-500 text-white shadow-rose-500/30" :
+                                    "bg-indigo-600 text-white shadow-indigo-500/30 hover:bg-indigo-700",
                             saving ? "opacity-50 cursor-not-allowed" : ""
                         )}
                     >
-                        {saving ? <Activity className="animate-spin" size={14} /> : <Save size={14} />}
-                        {saving ? 'Guardando...' : 'Guardar Información'}
+                        {saving ? <Activity className="animate-spin" size={14} /> :
+                            saveStatus === 'success' ? <CheckCircle2 size={14} /> :
+                                saveStatus === 'error' ? <AlertCircle size={14} /> :
+                                    <Save size={14} />}
+                        {saving ? 'Guardando...' :
+                            saveStatus === 'success' ? '¡Guardado!' :
+                                saveStatus === 'error' ? 'Error' :
+                                    'Guardar Información'}
                     </button>
                 </div>
             </div>
@@ -238,7 +256,7 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
             {/* ── Scrollable Form ── */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
 
-                {type === 'ADULT_ANAMNESIS' && (
+                {formType === 'ADULT_ANAMNESIS' && (
                     <>
                         <Section id="illness" title="Enfermedad Actual" icon={Activity} {...sectionProps}>
                             <Field label="Motivo de Consulta" name="consultationReason" placeholder="Ej. Dolor en molar superior..." size="full" {...commonProps} />
@@ -269,7 +287,7 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
                     </>
                 )}
 
-                {type === 'PED_ANAMNESIS' && (
+                {formType === 'PED_ANAMNESIS' && (
                     <>
                         <Section id="ped_initial" title="Sección" icon={Activity} {...sectionProps}>
                             <Field label="Motivo de consulta" name="consultationReason" placeholder="Ej. Revisión general..." type="textarea" size="full" {...commonProps} />
@@ -294,7 +312,7 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
                                     <input
                                         type="text"
                                         value={formData.birthWeight || ''}
-                                        onChange={e => updateFormData(type, 'birthWeight', e.target.value)}
+                                        onChange={e => updateFormData(formType, 'birthWeight', e.target.value)}
                                         className="w-full bg-slate-50/50 border border-slate-100 focus:border-indigo-300 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none transition-all"
                                     />
                                     <span className="text-[10px] font-black text-slate-400">kg</span>
@@ -321,7 +339,7 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
                                     <input
                                         type="text"
                                         value={formData.sweetConsumption || ''}
-                                        onChange={e => updateFormData(type, 'sweetConsumption', e.target.value)}
+                                        onChange={e => updateFormData(formType, 'sweetConsumption', e.target.value)}
                                         className="w-full bg-slate-50/50 border border-slate-100 focus:border-indigo-300 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none transition-all"
                                     />
                                     <span className="text-[10px] font-black text-slate-400 lowercase">Veces al día</span>
@@ -334,7 +352,7 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
                                     <input
                                         type="text"
                                         value={formData.sweetFrequency || ''}
-                                        onChange={e => updateFormData(type, 'sweetFrequency', e.target.value)}
+                                        onChange={e => updateFormData(formType, 'sweetFrequency', e.target.value)}
                                         className="w-full bg-slate-50/50 border border-slate-100 focus:border-indigo-300 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none transition-all"
                                     />
                                     <span className="text-[10px] font-black text-slate-400 lowercase">días/semana</span>
@@ -354,7 +372,7 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
                     </>
                 )}
 
-                {type === 'ENDODONTICS' && (
+                {formType === 'ENDODONTICS' && (
                     <>
                         <Section id="initial" title="Información Inicial" icon={Activity} {...sectionProps}>
                             <Field label="¿Tratamiento endodóntico previo?" name="prevEndoTreatment" size="full" {...commonProps} />
@@ -585,12 +603,12 @@ const QuestionnaireView = ({ patientId, type, onSaveSuccess }) => {
                                                 ].map(canal => (
                                                     <tr key={canal.id} className="border-b border-slate-50 group hover:bg-white transition-colors">
                                                         <td className="py-2 px-4 font-black text-indigo-500 uppercase">{canal.label}</td>
-                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_len`] || ''} onChange={e => updateFormData(type, `canal_${canal.id}_len`, e.target.value)} /></td>
-                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_ref`] || ''} onChange={e => updateFormData(type, `canal_${canal.id}_ref`, e.target.value)} /></td>
-                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_start`] || ''} onChange={e => updateFormData(type, `canal_${canal.id}_start`, e.target.value)} /></td>
-                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_apical`] || ''} onChange={e => updateFormData(type, `canal_${canal.id}_apical`, e.target.value)} /></td>
-                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_cem`] || ''} onChange={e => updateFormData(type, `canal_${canal.id}_cem`, e.target.value)} /></td>
-                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_gut`] || ''} onChange={e => updateFormData(type, `canal_${canal.id}_gut`, e.target.value)} /></td>
+                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_len`] || ''} onChange={e => updateFormData(formType, `canal_${canal.id}_len`, e.target.value)} /></td>
+                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_ref`] || ''} onChange={e => updateFormData(formType, `canal_${canal.id}_ref`, e.target.value)} /></td>
+                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_start`] || ''} onChange={e => updateFormData(formType, `canal_${canal.id}_start`, e.target.value)} /></td>
+                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_apical`] || ''} onChange={e => updateFormData(formType, `canal_${canal.id}_apical`, e.target.value)} /></td>
+                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_cem`] || ''} onChange={e => updateFormData(formType, `canal_${canal.id}_cem`, e.target.value)} /></td>
+                                                        <td className="py-2 px-4"><input className="w-full h-7 bg-white border border-slate-100 rounded px-2" value={formData[`canal_${canal.id}_gut`] || ''} onChange={e => updateFormData(formType, `canal_${canal.id}_gut`, e.target.value)} /></td>
                                                     </tr>
                                                 ))}
                                             </tbody>
