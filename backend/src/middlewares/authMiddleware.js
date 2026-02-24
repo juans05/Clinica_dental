@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prisma');
 
 module.exports = async (req, res, next) => {
+    console.log('[AuthMiddleware] v2.1 Processing request...');
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) {

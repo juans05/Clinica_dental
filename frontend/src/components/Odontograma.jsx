@@ -58,6 +58,17 @@ const FINDINGS_LIST = [
     { id: 'DIASTEMA', label: 'Diastema', visual: 'diastema', color: '#3b82f6' },
 ];
 
+const getStatusLetter = (data) => {
+    const conditions = data?.conditions || [];
+    if (conditions.includes('MISSING')) return 'A';
+    if (conditions.includes('EXTRACTION')) return 'X';
+    if (conditions.includes('IMPLANT')) return 'I';
+    if (conditions.includes('ROOTCANAL')) return 'E';
+    if (conditions.includes('CROWN')) return 'C';
+    if (conditions.includes('IMPACTED')) return 'R';
+    return '';
+};
+
 const EXPERT_COLORS = {
     CARIES: '#ef4444',
     FILLING: '#3b82f6',
@@ -598,83 +609,107 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
     const isPremolarTooth = isPremolar(number);
 
     const W = 55;
-    const H = 100;
-    const padding = 2;
+    const H = 110; // Slightly more height for anatomical roots
+    const padding = 4;
 
-    // Crown dimensions
-    const cH = 45;
+    // Crown dimensions (Anatomical)
+    const cH = 42;
     const cW = W - (padding * 2);
-    const cY = isUpperTooth ? H - cH : 0;
+    const cY = isUpperTooth ? H - cH - 5 : 5; // Leave space for boxes
 
     // Root dimensions
-    const rH = H - cH;
-    const rY = isUpperTooth ? 0 : cH;
+    const rY = isUpperTooth ? 5 : cH + 5;
+    const rH = H - cH - 15;
 
-    const missing = (data?.conditions || []).some(c => c.startsWith('MISSING'));
-    const allConditions = (data?.conditions || []).map(c => getConditionData(c)).filter(Boolean);
-
-    // Choose main icon to display (priority to BAD/Critical)
-    const badCond = allConditions.find(d => d.status === 'BAD' || d.id === 'EXTRACTION' || d.id === 'FRACTURE');
-    const cond = badCond || allConditions[0];
-
-    // Crown Center
     const mx = W / 2;
     const my = cY + (cH / 2);
-    const offset = 10;
+    const offset = 9;
 
-    // Surfaces polygons
+    // Anatomical Crown Shape (Trapezoidal)
+    const crownTopWidth = isUpperTooth ? cW : cW * 0.8;
+    const crownBottomWidth = isUpperTooth ? cW * 0.8 : cW;
+    const ctL = mx - (crownTopWidth / 2);
+    const ctR = mx + (crownTopWidth / 2);
+    const cbL = mx - (crownBottomWidth / 2);
+    const cbR = mx + (crownBottomWidth / 2);
+
+    const crownPoints = `${ctL},${cY} ${ctR},${cY} ${cbR},${cY + cH} ${cbL},${cY + cH}`;
+
+    // Surfaces polygons (adjusted for anatomical crown)
     const surf = {
         V: isUpperTooth
-            ? `${padding},${cY} ${W - padding},${cY} ${mx},${my}` // Top for upper
-            : `${padding},${cY + cH} ${W - padding},${cY + cH} ${mx},${my}`, // Bottom for lower
+            ? `${ctL},${cY} ${ctR},${cY} ${mx},${my}`
+            : `${cbL},${cY + cH} ${cbR},${cY + cH} ${mx},${my}`,
         L: isUpperTooth
-            ? `${padding},${cY + cH} ${W - padding},${cY + cH} ${mx},${my}`
-            : `${padding},${cY} ${W - padding},${cY} ${mx},${my}`,
-        M: `${padding},${cY} ${padding},${cY + cH} ${mx},${my}`,
-        D: `${W - padding},${cY} ${W - padding},${cY + cH} ${mx},${my}`,
+            ? `${cbL},${cY + cH} ${cbR},${cY + cH} ${mx},${my}`
+            : `${ctL},${cY} ${ctR},${cY} ${mx},${my}`,
+        M: isUpperTooth
+            ? `${ctL},${cY} ${cbL},${cY + cH} ${mx},${my}`
+            : `${ctL},${cY} ${cbL},${cY + cH} ${mx},${my}`,
+        D: isUpperTooth
+            ? `${ctR},${cY} ${cbR},${cY + cH} ${mx},${my}`
+            : `${ctR},${cY} ${cbR},${cY + cH} ${mx},${my}`,
         O: `${mx - offset},${my - offset} ${mx + offset},${my - offset} ${mx + offset},${my + offset} ${mx - offset},${my + offset}`,
     };
 
-    // Root Polygons (Schematic)
-    let rootPoints = "";
+    // Root Polygons (Anatomical)
+    let roots = [];
     if (isUpperTooth) {
+        const rootBaseY = cY;
+        const rootTopY = 5;
         if (isMolarTooth) {
-            // 3 roots for upper molars
-            rootPoints = `${padding},${cY} ${padding + cW / 6},${0} ${padding + cW / 3},${cY} ${mx},${0} ${padding + 2 * cW / 3},${cY} ${padding + 5 * cW / 6},${0} ${W - padding},${cY}`;
-        } else if ([14, 24].includes(number)) {
-            // 2 roots for premolars 14 and 24
-            rootPoints = `${padding},${cY} ${mx - 8},${0} ${mx},${cY} ${mx + 8},${0} ${W - padding},${cY}`;
+            roots = [
+                `${ctL},${rootBaseY} ${ctL - 2},${rootTopY} ${ctL + cW / 3},${rootBaseY}`,
+                `${mx - 4},${rootBaseY} ${mx},${rootTopY - 2} ${mx + 4},${rootBaseY}`,
+                `${ctR - cW / 3},${rootBaseY} ${ctR + 2},${rootTopY} ${ctR},${rootBaseY}`
+            ];
+        } else if ([14, 15, 24, 25].includes(number)) {
+            roots = [
+                `${ctL + 2},${rootBaseY} ${mx - 5},${rootTopY} ${mx},${rootBaseY}`,
+                `${mx},${rootBaseY} ${mx + 5},${rootTopY} ${ctR - 2},${rootBaseY}`
+            ];
         } else {
-            // 1 root for others
-            rootPoints = `${mx - 15},${cY} ${mx},${0} ${mx + 15},${cY}`;
+            roots = [`${ctL + 5},${rootBaseY} ${mx},${rootTopY} ${ctR - 5},${rootBaseY}`];
         }
     } else {
+        const rootBaseY = cY + cH;
+        const rootBottomY = H - 5;
         if (isMolarTooth) {
-            // 2 roots for lower molars
-            rootPoints = `${padding},${cY + cH} ${mx - 8},${H} ${mx},${cY + cH} ${mx + 8},${H} ${W - padding},${cY + cH}`;
+            roots = [
+                `${cbL},${rootBaseY} ${cbL - 2},${rootBottomY} ${mx},${rootBaseY}`,
+                `${mx},${rootBaseY} ${cbR + 2},${rootBottomY} ${cbR},${rootBaseY}`
+            ];
         } else {
-            // 1 root for others
-            rootPoints = `${mx - 15},${cY + cH} ${mx},${H} ${mx + 15},${cY + cH}`;
+            roots = [`${cbL + 5},${rootBaseY} ${mx},${rootBottomY} ${cbR - 5},${rootBaseY}`];
         }
     }
 
-    const borderColor = isSelected ? '#3b82f6' : '#64748b';
-    const borderWidth = isSelected ? 2 : 1;
+    const missing = (data?.conditions || []).some(c => c.startsWith('MISSING'));
+    const allConditions = (data?.conditions || []).map(c => getConditionData(c)).filter(Boolean);
+    const borderColor = isSelected ? '#3b82f6' : '#94a3b8';
+    const borderWidth = isSelected ? 2 : 1.2;
 
-    // Build tooltip text
     const tooltipText = `Diente ${number}\n${allConditions.map(c => c.label).join(', ')}`;
 
     return (
-        <div className="flex flex-col items-center select-none group" title={tooltipText}>
+        <div className="flex flex-col items-center select-none group relative" title={tooltipText} style={{ width: W }}>
+            {/* Top Status Box */}
+            <div className={cn(
+                "w-8 h-8 border border-slate-300 mb-1 flex items-center justify-center text-[11px] font-black bg-white transition-colors",
+                getStatusLetter(data) ? "text-red-500 border-red-200" : "text-slate-300"
+            )}>
+                {isUpperTooth ? getStatusLetter(data) : ''}
+            </div>
+
             {/* Tooth Number Box */}
             <div className={cn(
-                "w-full py-1 mb-2 border-x flex justify-center transition-all",
-                data?.evolutionState === 'CURADO' ? "bg-green-500 border-green-600 text-white shadow-lg" :
-                    data?.evolutionState === 'PENDIENTE' ? "bg-amber-500 border-amber-600 text-white shadow-lg" :
-                        data?.evolutionState === 'CANCELADO' ? "bg-slate-400 border-slate-500 text-white shadow-lg" :
-                            "bg-slate-100 border-slate-200 text-slate-600"
+                "w-full py-0.5 mb-1 flex justify-center transition-all border border-slate-200",
+                data?.evolutionState === 'CURADO' ? "bg-green-500 border-green-600 text-white" :
+                    data?.evolutionState === 'PENDIENTE' ? "bg-amber-500 border-amber-600 text-white" :
+                        data?.evolutionState === 'CANCELADO' ? "bg-slate-400 border-slate-500 text-white" :
+                            "bg-slate-50 text-slate-500"
             )}>
-                <span className="text-[11px] font-black">{number}</span>
+                <span className="text-[10px] font-black">{number}</span>
             </div>
 
             <svg
@@ -683,24 +718,22 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                 className={cn("block cursor-pointer overflow-visible")}
                 onClick={(e) => onTooth(number, e)}
             >
-                {/* Root */}
-                {isMolarTooth && isUpperTooth ? (
-                    <polyline points={rootPoints} fill="none" stroke={borderColor} strokeWidth={borderWidth} />
-                ) : (
-                    <polygon points={rootPoints} fill="none" stroke={borderColor} strokeWidth={borderWidth} />
-                )}
+                {/* Roots */}
+                {roots.map((r, i) => (
+                    <polygon key={i} points={r} fill="none" stroke={borderColor} strokeWidth={borderWidth} />
+                ))}
 
                 {/* Crown Border */}
-                <rect
-                    x={padding} y={cY} width={cW} height={cH}
+                <polygon
+                    points={crownPoints}
                     fill="white"
                     stroke={borderColor} strokeWidth={borderWidth}
                 />
 
                 {missing || (data?.conditions || []).includes('MISSING') ? (
-                    <g stroke="#94a3b8" strokeWidth={2} strokeLinecap="round">
-                        <line x1={padding + 5} y1={cY + 5} x2={W - padding - 5} y2={cY + cH - 5} />
-                        <line x1={W - padding - 5} y1={cY + 5} x2={padding + 5} y2={cY + cH - 5} />
+                    <g stroke="#ef4444" strokeWidth={2} strokeLinecap="round">
+                        <line x1={8} y1={cY + 8} x2={W - 8} y2={cY + cH - 8} />
+                        <line x1={W - 8} y1={cY + 8} x2={8} y2={cY + cH - 8} />
                     </g>
                 ) : (
                     <g>
@@ -714,10 +747,10 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                                     <polygon points={surf[s]}
                                         fill={fill || "transparent"}
                                         onClick={e => { e.stopPropagation(); onSurface(number, s, e); }}
-                                        className="hover:fill-slate-100 transition-colors"
+                                        className="hover:fill-blue-50/50 transition-colors"
                                     />
                                     {isSealant && (
-                                        <circle cx={s === 'O' ? mx : (s === 'M' ? padding + 5 : (s === 'D' ? W - padding - 5 : mx))}
+                                        <circle cx={s === 'O' ? mx : (s === 'M' ? ctL + 5 : (s === 'D' ? ctR - 5 : mx))}
                                             cy={s === 'O' ? my : (s === 'V' ? (isUpperTooth ? cY + 5 : cY + cH - 5) : my)}
                                             r="3" fill="#86efac" className="pointer-events-none" />
                                     )}
@@ -728,28 +761,16 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                         {/* Surface Inner Borders */}
                         {['V', 'L', 'M', 'D'].map(s => (
                             <polygon key={`b${s}`} points={surf[s]}
-                                fill="none" stroke="#cbd5e1" strokeWidth="0.5"
+                                fill="none" stroke="#e2e8f0" strokeWidth="0.5"
                                 className="pointer-events-none"
                             />
                         ))}
-                        <polygon points={surf.O} fill="none" stroke="#cbd5e1" strokeWidth="0.5" className="pointer-events-none" />
+                        <polygon points={surf.O} fill="none" stroke="#e2e8f0" strokeWidth="0.5" className="pointer-events-none" />
 
-                        {/* Oclusal Grid Lines */}
-                        {isMolarTooth ? (
-                            <g stroke="#cbd5e1" strokeWidth="0.5" className="pointer-events-none">
-                                <line x1={mx - offset / 3} y1={my - offset} x2={mx - offset / 3} y2={my + offset} />
-                                <line x1={mx + offset / 3} y1={my - offset} x2={mx + offset / 3} y2={my + offset} />
-                                <line x1={mx - offset} y1={my} x2={mx + offset} y2={my} />
-                            </g>
-                        ) : isPremolarTooth ? (
-                            <g stroke="#cbd5e1" strokeWidth="0.5" className="pointer-events-none">
-                                <line x1={mx - offset} y1={my - offset / 3} x2={mx + offset} y2={my - offset / 3} />
-                                <line x1={mx - offset} y1={my + offset / 3} x2={mx + offset} y2={my + offset / 3} />
-                            </g>
-                        ) : (
-                            <g stroke="#cbd5e1" strokeWidth="0.5" className="pointer-events-none">
-                                <line x1={mx - offset} y1={my} x2={mx + offset} y2={my} />
-                            </g>
+                        {/* Anatomical Grid / Fissures */}
+                        {isMolarTooth && (
+                            <path d={`M${mx - 5},${my - 5} L${mx + 5},${my + 5} M${mx + 5},${my - 5} L${mx - 5},${my + 5}`}
+                                stroke="#e2e8f0" strokeWidth="0.5" className="pointer-events-none" />
                         )}
 
                         {/* Overlays Section */}
@@ -757,83 +778,45 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                             const color = cond.color;
                             const isUpper = isUpperTooth;
 
-                            // Expert Condition-specific overlays
                             switch (cond.id) {
                                 case 'CROWN':
                                     return (
-                                        <circle key={idx} cx={mx} cy={my} r={cH / 1.8}
+                                        <polygon key={idx} points={crownPoints}
                                             fill="none" stroke={color} strokeWidth="3" />
                                     );
                                 case 'EXTRACTION':
                                     return (
                                         <g key={idx}>
-                                            <path d={`M${mx},${isUpper ? cY - 10 : cY + cH + 10} v${isUpper ? 20 : -20} l-5,${isUpper ? -6 : 6} m5,${isUpper ? 6 : -6} l5,${isUpper ? -6 : 6}`}
+                                            <path d={`M${mx},${isUpper ? cY - 12 : cY + cH + 12} v${isUpper ? 25 : -25} l-6,${isUpper ? -8 : 8} m6,${isUpper ? 8 : -8} l6,${isUpper ? -8 : 8}`}
                                                 fill="none" stroke={color} strokeWidth="3" />
                                         </g>
                                     );
                                 case 'IMPACTED':
                                     return (
-                                        <g key={idx}>
-                                            <circle cx={mx} cy={my} r={cH / 2.5} fill="none" stroke={color} strokeWidth="1.5" />
-                                            <text x={mx} y={my + 4} fontSize="12" textAnchor="middle" fill={color} fontWeight="bold">D</text>
-                                        </g>
+                                        <circle key={idx} cx={mx} cy={my} r={cH / 2} fill="none" stroke={color} strokeWidth="2" strokeDasharray="3,2" />
                                     );
                                 case 'IMPLANT':
                                     return (
                                         <g key={idx}>
-                                            <path d={`M${mx - 4},${isUpper ? 5 : H - 25} h8 v15 l-4,5 l-4,-5 z`} fill={color} />
-                                            <line x1={mx - 4} y1={isUpper ? 10 : H - 20} x2={mx + 4} y2={isUpper ? 10 : H - 20} stroke="white" strokeWidth="1" />
-                                            <line x1={mx - 4} y1={isUpper ? 15 : H - 15} x2={mx + 4} y2={isUpper ? 15 : H - 15} stroke="white" strokeWidth="1" />
+                                            <rect x={mx - 3} y={isUpper ? 5 : H - 30} width={6} height={25} fill={color} rx="1" />
+                                            {[...Array(5)].map((_, i) => (
+                                                <line key={i} x1={mx - 3} y1={(isUpper ? 8 : H - 27) + i * 4} x2={mx + 3} y2={(isUpper ? 10 : H - 25) + i * 4} stroke="white" strokeWidth="0.5" />
+                                            ))}
                                         </g>
                                     );
                                 case 'BRIDGE':
                                     return (
-                                        <line key={idx} x1={-10} y1={my} x2={W + 10} y2={my} stroke={color} strokeWidth="3" />
-                                    );
-                                case 'REM_PROSTHESIS':
-                                    return (
-                                        <line key={idx} x1={-10} y1={my} x2={W + 10} y2={my} stroke={color} strokeWidth="2.5" strokeDasharray="4,4" />
-                                    );
-                                case 'ORTHO_FIXED':
-                                    return (
-                                        <g key={idx}>
-                                            <line x1={-5} y1={my} x2={W + 5} y2={my} stroke={color} strokeWidth="2" />
-                                            <rect x={mx - 3} y={my - 3} width={6} height={6} fill={color} />
-                                            <rect x={mx - 1} y={my - 1} width={2} height={2} fill="white" />
-                                        </g>
+                                        <line key={idx} x1={-5} y1={my} x2={W + 5} y2={my} stroke={color} strokeWidth="4" />
                                     );
                                 case 'ROOTCANAL':
-                                    const jY = isUpper ? cY : cY + cH;
-                                    const dY = isUpper ? -5 : 5;
                                     return (
                                         <g key={idx}>
-                                            <line x1={mx} y1={jY} x2={mx} y2={jY + dY * 8} stroke={color} strokeWidth="3" />
+                                            {roots.map((r, i) => {
+                                                const p = r.split(' ');
+                                                const tip = p[1].split(',');
+                                                return <line key={i} x1={mx} y1={my} x2={tip[0]} y2={tip[1]} stroke={color} strokeWidth="3" strokeLinecap="round" />;
+                                            })}
                                         </g>
-                                    );
-                                case 'FRACTURE':
-                                    return (
-                                        <line key={idx} x1={padding} y1={cY} x2={W - padding} y2={cY + cH} stroke={color} strokeWidth="3" />
-                                    );
-                                case 'VENEER':
-                                    return (
-                                        <path key={idx} d={isUpper
-                                            ? `M${padding},${cY + cH} V${cY + 10} Q${mx},${cY} ${W - padding},${cY + 10} V${cY + cH} Z`
-                                            : `M${padding},${cY} V${cY + cH - 10} Q${mx},${cY + cH} ${W - padding},${cY + cH - 10} V${cY} Z`
-                                        } fill={color} fillOpacity="0.4" stroke={color} strokeWidth="1.5" />
-                                    );
-                                case 'DIASTEMA':
-                                    return (
-                                        <g key={idx} stroke={color} strokeWidth="2">
-                                            <path d={`M${padding},${my - 5} Q${padding - 5},${my} ${padding},${my + 5}`} fill="none" />
-                                            <path d={`M${W - padding},${my - 5} Q${W - padding + 5},${my} ${W - padding},${my + 5}`} fill="none" />
-                                        </g>
-                                    );
-                                case 'GINGIVITIS':
-                                    return (
-                                        <path key={idx} d={isUpper
-                                            ? `M${padding},${cY} Q${mx},${cY + 10} ${W - padding},${cY}`
-                                            : `M${padding},${cY + cH} Q${mx},${cY + cH - 10} ${W - padding},${cY + cH}`
-                                        } fill="none" stroke={color} strokeWidth="2.5" />
                                     );
                                 default:
                                     return null;
@@ -842,6 +825,14 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                     </g>
                 )}
             </svg>
+
+            {/* Bottom Status Box */}
+            <div className={cn(
+                "w-8 h-8 border border-slate-300 mt-1 flex items-center justify-center text-[11px] font-black bg-white transition-colors",
+                getStatusLetter(data) ? "text-red-500 border-red-200" : "text-slate-300"
+            )}>
+                {!isUpperTooth ? getStatusLetter(data) : ''}
+            </div>
         </div>
     );
 };
@@ -1083,17 +1074,9 @@ const Odontograma = ({ patientId }) => {
 
                     <div className="h-4 w-[1px] bg-slate-200 mx-2" />
 
-                    <div className="flex bg-slate-100 p-1 rounded-xl">
-                        <button
-                            onClick={() => setIsTemporary(false)}
-                            className={cn("px-4 py-1.5 rounded-lg text-[11px] font-black transition-all", !isTemporary ? "bg-white text-blue-600 shadow-sm" : "text-slate-400")}>
-                            ADULTO
-                        </button>
-                        <button
-                            onClick={() => setIsTemporary(true)}
-                            className={cn("px-4 py-1.5 rounded-lg text-[11px] font-black transition-all", isTemporary ? "bg-white text-blue-600 shadow-sm" : "text-slate-400")}>
-                            NIÑO
-                        </button>
+                    <div className="h-4 w-[1px] bg-slate-200 mx-2" />
+                    <div className="text-[11px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 italic shadow-inner">
+                        Vista Mixta (FDI)
                     </div>
                 </div>
 
@@ -1152,39 +1135,31 @@ const Odontograma = ({ patientId }) => {
                 </button>
             </div>
 
-            {/* ── Dental Chart ── */}
-            <div className="flex flex-col items-center gap-10 mb-12 overflow-x-auto py-4 min-h-[500px] justify-center">
-                {isTemporary ? (
-                    <>
-                        {/* Pediatric Upper Row */}
-                        <div className="flex gap-4">
-                            {renderRow([55, 54, 53, 52, 51], true)}
-                            <div className="w-[1px] bg-slate-200 self-stretch my-2" />
-                            {renderRow([61, 62, 63, 64, 65], true)}
-                        </div>
-                        {/* Pediatric Lower Row */}
-                        <div className="flex gap-4">
-                            {renderRow([85, 84, 83, 82, 81], false)}
-                            <div className="w-[1px] bg-slate-200 self-stretch my-2" />
-                            {renderRow([71, 72, 73, 74, 75], false)}
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        {/* Adult Upper Row */}
-                        <div className="flex gap-4">
-                            {renderRow(UPPER_RIGHT, true)}
-                            <div className="w-[1px] bg-slate-200 self-stretch my-2" />
-                            {renderRow(UPPER_LEFT, true)}
-                        </div>
-                        {/* Adult Lower Row */}
-                        <div className="flex gap-4">
-                            {renderRow(LOWER_RIGHT, false)}
-                            <div className="w-[1px] bg-slate-200 self-stretch my-2" />
-                            {renderRow(LOWER_LEFT, false)}
-                        </div>
-                    </>
-                )}
+            {/* ── Dental Chart (Integrated Mixed Dentition) ── */}
+            <div className="flex flex-col items-center gap-1 overflow-x-auto py-8 bg-white rounded-[40px] border border-slate-100 shadow-sm min-w-fit">
+                {/* Permanent Upper */}
+                <div className="flex gap-1 mb-2">
+                    <div className="flex gap-1 pr-4 border-r-2 border-slate-100">{renderRow(UPPER_RIGHT, true)}</div>
+                    <div className="flex gap-1 pl-4">{renderRow(UPPER_LEFT, true)}</div>
+                </div>
+
+                {/* Primary Upper */}
+                <div className="flex gap-1 mb-12">
+                    <div className="flex gap-1 pr-4 border-r-2 border-slate-100">{renderRow(PRIMARY_UPPER_RIGHT, true)}</div>
+                    <div className="flex gap-1 pl-4">{renderRow(PRIMARY_UPPER_LEFT, true)}</div>
+                </div>
+
+                {/* Primary Lower */}
+                <div className="flex gap-1 mb-2">
+                    <div className="flex gap-1 pr-4 border-r-2 border-slate-100">{renderRow(PRIMARY_LOWER_RIGHT, false)}</div>
+                    <div className="flex gap-1 pl-4">{renderRow(PRIMARY_LOWER_LEFT, false)}</div>
+                </div>
+
+                {/* Permanent Lower */}
+                <div className="flex gap-1">
+                    <div className="flex gap-1 pr-4 border-r-2 border-slate-100">{renderRow(LOWER_RIGHT, false)}</div>
+                    <div className="flex gap-1 pl-4">{renderRow(LOWER_LEFT, false)}</div>
+                </div>
             </div>
 
             {/* ── Treatment Plan Table ── */}
