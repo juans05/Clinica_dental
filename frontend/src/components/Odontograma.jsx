@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Save, X, Search, MoreHorizontal, Hash, Info, ClipboardList, Trash2, Activity
+    Save, X, Search, MoreHorizontal, Hash, Info, ClipboardList, Trash2, Activity,
+    History, Lock, Check, CheckCircle, AlertCircle, Box, Calendar
 } from 'lucide-react';
 import useOdontogramStore from '../store/useOdontogramStore';
 import useBudgetStore from '../store/useBudgetStore';
@@ -30,6 +31,13 @@ const isWisdom = n => [18, 28, 38, 48].includes(n);
 const isUpper = n => (n >= 11 && n <= 28) || (n >= 51 && n <= 65);
 const isPrimary = n => n >= 51 && n <= 85;
 
+const ALL_TEETH = [
+    ...UPPER_RIGHT, ...UPPER_LEFT,
+    ...LOWER_LEFT, ...LOWER_RIGHT,
+    ...PRIMARY_UPPER_RIGHT, ...PRIMARY_UPPER_LEFT,
+    ...PRIMARY_LOWER_LEFT, ...PRIMARY_LOWER_RIGHT
+];
+
 const toothType = n => {
     if (isWisdom(n)) return 'Cordal';
     if (isMolar(n)) return 'Molar';
@@ -38,81 +46,139 @@ const toothType = n => {
     return 'Incisivo';
 };
 
-const FINDINGS_LIST = [
-    { id: 'CARIES', label: 'Caries', visual: 'surface_filled', color: '#ef4444' },
-    { id: 'FILLING', label: 'Obturación', visual: 'surface_filled', color: '#3b82f6' },
-    { id: 'CROWN', label: 'Corona', visual: 'circle_full', color: '#facc15' },
-    { id: 'EXTRACTION', label: 'Extracción indicada', visual: 'arrow_down_red', color: '#ef4444' },
-    { id: 'MISSING', label: 'Diente ausente', visual: 'cross_gray', color: '#94a3b8' },
-    { id: 'ROOTCANAL', label: 'Endodoncia', visual: 'root_line', color: '#22c55e' },
-    { id: 'IMPLANT', label: 'Implante', visual: 'screw', color: '#06b6d4' },
-    { id: 'BRIDGE', label: 'Puente', visual: 'bridge_line', color: '#f97316' },
-    { id: 'ORTHO_FIXED', label: 'Aparato ortodóntico fijo', visual: 'ortho_violet', color: '#a855f7' },
-    { id: 'FRACTURE', label: 'Fractura', visual: 'slash_black', color: '#000000' },
-    { id: 'IMPACTED', label: 'Diente retenido/impactado', visual: 'd_circle', color: '#78350f' },
-    { id: 'SEALANT', label: 'Sellante', visual: 'surface_mark', color: '#86efac' },
-    { id: 'REM_PROSTHESIS', label: 'Prótesis removible', visual: 'dotted_line', color: '#f472b6' },
-    // Otros hallazgos adicionales (opcionales pero útiles)
-    { id: 'VENEER', label: 'Carillas', visual: 'veneer', color: '#3b82f6' },
-    { id: 'GINGIVITIS', label: 'Gingivitis', visual: 'gingivitis', color: '#ef4444' },
-    { id: 'DIASTEMA', label: 'Diastema', visual: 'diastema', color: '#3b82f6' },
+const PROTOCOL_COLORS = {
+    RED: '#DC2626',
+    BLUE: '#2563EB',
+};
+
+const MINSA_FINDINGS = [
+    // GRUPO: Lesión de Caries (ROJO)
+    { id: 'MB', label: 'Mancha Blanca', sigla: 'MB', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
+    { id: 'CE', label: 'Caries Esmalte', sigla: 'CE', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
+    { id: 'CD', label: 'Caries Dentina', sigla: 'CD', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
+    { id: 'CDP', label: 'Caries Dentina/Pulpa', sigla: 'CDP', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
+
+    // GRUPO: Defectos de Desarrollo del Esmalte (ROJO)
+    { id: 'HP', label: 'Hipoplasia', sigla: 'HP', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box' },
+    { id: 'HM', label: 'Hipomineralización', sigla: 'HM', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box' },
+    { id: 'O', label: 'Opacidad Esmalte', sigla: 'O', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box' },
+    { id: 'D', label: 'Decoloración Esmalte', sigla: 'D', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box' },
+
+    // GRUPO: Restauraciones (A/R)
+    { id: 'AM', label: 'Amalgama Dental', sigla: 'AM', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
+    { id: 'R', label: 'Resina Compuesta', sigla: 'R', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
+    { id: 'IV', label: 'Ionómero de Vidrio', sigla: 'IV', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
+    { id: 'IM', label: 'Incrustación Metálica', sigla: 'IM', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
+    { id: 'IE', label: 'Incrustación Estética', sigla: 'IE', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
+    { id: 'C', label: 'Carilla Estética', sigla: 'C', group: 'RESTORATION', type: 'drawing', visual: 'veneer' },
+    { id: 'RT', label: 'Restauración Temporal', sigla: 'RT', group: 'RESTORATION', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
+
+    // GRUPO: Sellante (A/R)
+    { id: 'S', label: 'Sellante', sigla: 'S', group: 'SEALANT', type: 'drawing', visual: 'surface_mark' },
+    { id: 'FFP', label: 'Fosas y Fisuras Prof.', sigla: 'FFP', group: 'SEALANT', color: PROTOCOL_COLORS.BLUE, type: 'box' },
+
+    // GRUPO: Tratamiento Pulpar (A/R)
+    { id: 'TC', label: 'Tratamiento de Conductos', sigla: 'TC', group: 'PULPAR', type: 'drawing', visual: 'root_line' },
+    { id: 'PC', label: 'Pulpectomía', sigla: 'PC', group: 'PULPAR', type: 'drawing', visual: 'root_line' },
+    { id: 'PP', label: 'Pulpotomía', sigla: 'PP', group: 'PULPAR', type: 'drawing', visual: 'coronal_pulp' },
+
+    // GRUPO: Prótesis y Coronas (A/R)
+    { id: 'CM', label: 'Corona Metálica', sigla: 'CM', group: 'PROSTHESIS', type: 'drawing', visual: 'rect_full' },
+    { id: 'CF', label: 'Corona Fenestrada', sigla: 'CF', group: 'PROSTHESIS', type: 'drawing', visual: 'rect_full' },
+    { id: 'CMC', label: 'Corona Metal Cerámica', sigla: 'CMC', group: 'PROSTHESIS', type: 'drawing', visual: 'rect_full' },
+    { id: 'CV', label: 'Corona Veneer', sigla: 'CV', group: 'PROSTHESIS', type: 'drawing', visual: 'rect_full' },
+    { id: 'CJ', label: 'Corona Jacket', sigla: 'CJ', group: 'PROSTHESIS', type: 'drawing', visual: 'rect_full' },
+    { id: 'CT', label: 'Corona Temporal', sigla: 'CT', group: 'PROSTHESIS', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'rect_full' },
+    { id: 'PF', label: 'Prótesis Fija (Puente)', sigla: 'PF', group: 'PROSTHESIS', type: 'drawing', visual: 'bridge_range' },
+    { id: 'PR', label: 'Prótesis Removible', sigla: 'PR', group: 'PROSTHESIS', type: 'drawing', visual: 'parallel_lines_apex' },
+    { id: 'PT', label: 'Prótesis Total', sigla: 'PT', group: 'PROSTHESIS', type: 'drawing', visual: 'parallel_lines_crown' },
+    { id: 'EM', label: 'Espigo-Muñón', sigla: 'EM', group: 'PROSTHESIS', type: 'drawing', visual: 'root_line' },
+    { id: 'IMP', label: 'Implante Dental', sigla: 'IMP', group: 'PROSTHESIS', type: 'drawing', visual: 'screw' },
+
+    // GRUPO: Anomalías y Posición (Siempre AZUL)
+    { id: 'MISSING', label: 'Pieza Ausente (Aspa)', sigla: 'X', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'cross_big' },
+    { id: 'EDENTULO', label: 'Edéntulo Total', sigla: 'ET', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'edentulous_range' },
+    { id: 'ERUPTION', label: 'Pieza en Erupción', sigla: '↑zigzag', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'zigzag_arrow' },
+    { id: 'EXTRUDED', label: 'Pieza Extruida', sigla: '↓', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'arrow_extrude' },
+    { id: 'INTRUDED', label: 'Pieza Intruida', sigla: '↑', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'arrow_intrude' },
+    { id: 'SUPERNUMERARY', label: 'Pieza Supernumeraria', sigla: 'S', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'supernumerary_partner' },
+    { id: 'ECTOPIC', label: 'Pieza Ectópica', sigla: 'E', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
+    { id: 'IMPACTED', label: 'Impactación', sigla: 'I', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
+    { id: 'MAC', label: 'Macrodoncia', sigla: 'MAC', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
+    { id: 'MIC', label: 'Microdoncia', sigla: 'MIC', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
+    { id: 'FUS', label: 'Fusión', sigla: 'FUS', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'number_fusion' },
+    { id: 'GEM', label: 'Geminación', sigla: 'GEM', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'circle_over_number' },
+    { id: 'GIR', label: 'Giroversión', sigla: 'GIR', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'curve_arrow' },
+    { id: 'TRA', label: 'Transposición', sigla: 'TRA', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'cross_arrows' },
+    { id: 'CLAV', label: 'Pieza en Clavija', sigla: 'Δ', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'triangle_over_number' },
+    { id: 'DIAST', label: 'Diastema', sigla: ')(', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'diastema_parenthesis' },
+
+    // GRUPO: Otros hallazgos (ROJO)
+    { id: 'FX', label: 'Fractura', sigla: 'FX', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'slash_line' },
+    { id: 'DES', label: 'Superficie Desgastada', sigla: 'DES', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'text' },
+    { id: 'RR', label: 'Remanente Radicular', sigla: 'RR', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'box' },
+    { id: 'MOB', label: 'Movilidad Patológica', sigla: 'M', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'text_grado' },
+
+    // GRUPO: Ortodoncia (A/R)
+    { id: 'OFJ', label: 'Aparato Ortodóntico Fijo', sigla: 'OFJ', group: 'ORTHO', type: 'drawing', visual: 'ortho_range' },
+    { id: 'ORE', label: 'Aparato Ortodóntico Removible', sigla: 'ORE', group: 'ORTHO', type: 'drawing', visual: 'ortho_zigzag' },
 ];
 
 const getStatusLetter = (data) => {
     const conditions = data?.conditions || [];
-    if (conditions.includes('MISSING')) return 'A';
-    if (conditions.includes('EXTRACTION')) return 'X';
-    if (conditions.includes('IMPLANT')) return 'I';
-    if (conditions.includes('ROOTCANAL')) return 'E';
-    if (conditions.includes('CROWN')) return 'C';
-    if (conditions.includes('IMPACTED')) return 'R';
-    return '';
+    const surfaceConditions = Object.values(data?.surfaces || {}).flat();
+    const allIds = [...new Set([...conditions, ...surfaceConditions])];
+
+    const sigles = allIds
+        .map(c => {
+            if (typeof c !== 'string') return null;
+            const [id, state, extra] = c.split(':');
+
+            // Skip _L (Lines) for sigla boxes, only show for explicit anchors
+            if (id === 'OFJ_L' || id === 'ORE_L' || id === 'PF_L' || id === 'PR_L' || id === 'PT_L') return null;
+
+            const finding = MINSA_FINDINGS.find(f => f.id === id);
+
+            if (!finding) return null;
+
+            // Priority: EXTRA (M1, M2, TC, etc) > Finding Sigla
+            let label = finding.sigla;
+            if (extra) {
+                if (id === 'MOB') label = extra; // M1, M2, M3
+                if (['TC', 'PC', 'PP'].includes(id)) label = extra; // TC, PC, PP
+                if (id === 'TRA') label = `${finding.sigla} ${extra}`;
+                else if (finding.group === 'POSITION') label = `${finding.sigla}(${extra})`;
+            }
+
+            const isCaries = finding.group === 'CARIES';
+            const isDDE = finding.group === 'DDE';
+
+            if (finding.type === 'box' || finding.type === 'text_grado' || isCaries || isDDE || ['TC', 'PC', 'PP', 'CT', 'CM', 'CMC', 'CV', 'CJ', 'CF', 'IMP', 'OFJ', 'TRA'].includes(id)) {
+                return {
+                    sigla: label,
+                    color: (isCaries || isDDE || state === 'BAD') ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE
+                };
+            }
+            return null;
+        })
+        .filter(Boolean);
+
+    return sigles;
 };
 
-const EXPERT_COLORS = {
-    CARIES: '#ef4444',
-    FILLING: '#3b82f6',
-    CROWN: '#facc15',
-    EXTRACTION: '#ef4444',
-    MISSING: '#94a3b8',
-    ROOTCANAL: '#22c55e',
-    IMPLANT: '#06b6d4',
-    BRIDGE: '#f97316',
-    ORTHO_FIXED: '#a855f7',
-    FRACTURE: '#000000',
-    IMPACTED: '#78350f',
-    SEALANT: '#86efac',
-    REM_PROSTHESIS: '#f472b6',
-};
-
-const getConditionData = (condId) => {
-    if (typeof condId !== 'string' || !condId || condId === 'HEALTHY') return null;
-
-    // Handle Evolution States
-    if (condId === 'CURADO') return { label: 'Curado', color: '#22c55e', bg: '#22c55e15', status: 'GOOD' };
-    if (condId === 'PENDIENTE') return { label: 'Pendiente', color: '#facc15', bg: '#facc1515', status: 'NEUTRAL' };
-    if (condId === 'CANCELADO') return { label: 'Cancelado', color: '#ef4444', bg: '#ef444415', status: 'BAD' };
-
-    // Check for status suffix for backward compatibility if needed, 
-    // but preference is the expert list now
-    const parts = condId.split('_');
-    const status = parts[parts.length - 1];
-    const isStatus = ['GOOD', 'BAD'].includes(status);
-    const baseId = isStatus ? parts.slice(0, -1).join('_') : condId;
-
-    const finding = FINDINGS_LIST.find(f => f.id === baseId);
+const getConditionData = (condStr) => {
+    if (typeof condStr !== 'string' || !condStr) return null;
+    const [id, state, extra] = condStr.split(':');
+    const lookupId = id === 'OFJ_L' ? 'OFJ' : id;
+    const finding = MINSA_FINDINGS.find(f => f.id === lookupId);
     if (!finding) return null;
 
-    // Expert color has preference
-    const color = EXPERT_COLORS[baseId] || finding.color || '#64748b';
-    const bg = color + '15'; // 8% opacity for background
+    let color = finding.color;
+    if (!color) {
+        color = state === 'BAD' ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE;
+    }
 
-    return {
-        ...finding,
-        color,
-        bg,
-        status: isStatus ? status : (baseId === 'CARIES' ? 'BAD' : 'NEUTRAL')
-    };
+    return { ...finding, id: condStr, color, state, extra };
 };
 
 const FindingIcon = ({ type, color = '#3b82f6' }) => {
@@ -317,87 +383,156 @@ const sc = (tooth, s) => {
     const items = tooth.surfaces[s] || [];
     if (items.length === 0) return null;
 
-    // Prioridad: BAD (Rojo) > GOOD (Azul) > NEUTRAL
     const dataList = items.map(id => getConditionData(id)).filter(Boolean);
-    const bad = dataList.find(d => d.status === 'BAD' || d.id === 'CARIES' || d.id === 'FRACTURE');
-    if (bad) return bad.color;
-    const good = dataList.find(d => d.status === 'GOOD');
-    if (good) return good.color;
+    // Pathologies (Red) take precedence over healthy states/restorations (Blue)
+    const redItem = dataList.find(d => d.group === 'CARIES' || d.group === 'DDE' || d.id === 'FX' || d.state === 'BAD' || d.color === PROTOCOL_COLORS.RED);
+    if (redItem) return PROTOCOL_COLORS.RED;
+
+    const blueItem = dataList.find(d => d.state === 'GOOD' || d.color === PROTOCOL_COLORS.BLUE);
+    if (blueItem) return PROTOCOL_COLORS.BLUE;
+
     return dataList[0]?.color || null;
 };
 
-const ToothDetailModal = ({ tooth, number, onClose, onMarkTooth, onMarkSurface, onSetNote, patientId }) => {
+const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, onMarkSurface, onSetNote, patientId, activeMode }) => {
     if (!tooth) return null;
 
     const { fetchToothHistory, toothHistory } = useOdontogramStore();
-    const { syncToothToBudget, fetchServices } = useBudgetStore();
-    const { user } = useAuth();
-    const [note, setNote] = React.useState(tooth.notes || '');
-    const [syncing, setSyncing] = React.useState(false);
+    const [search, setSearch] = React.useState('');
+    const [selectedFinding, setSelectedFinding] = React.useState(null);
+    const [findingState, setFindingState] = React.useState('BAD');
+    const [subSelection, setSubSelection] = React.useState([]); // Multi or single
 
     React.useEffect(() => {
         fetchToothHistory(patientId, number);
-        fetchServices();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [number]);
 
-    const handleSync = async () => {
-        setSyncing(true);
-        const res = await syncToothToBudget(patientId, user.id, number, tooth);
-        setSyncing(false);
-        alert(res.message);
+    const filteredFindings = MINSA_FINDINGS.filter(f =>
+        f.label.toLowerCase().includes(search.toLowerCase()) ||
+        f.sigla.toLowerCase().includes(search.toLowerCase())
+    );
+
+    const handleApplyFinding = () => {
+        if (!selectedFinding) return;
+
+        let finalId = selectedFinding.id;
+
+        if (['OFJ', 'ORE', 'PF', 'PR', 'PT', 'EDENTULO'].includes(finalId) && subSelection.length > 0) {
+            // Atomic update for the whole range
+            onMarkTeeth(subSelection.map(Number), `${finalId}:${findingState}`);
+        } else if ((finalId === 'FUS' || finalId === 'TRA' || finalId === 'SUPERNUMERARY') && subSelection.length > 0) {
+            // Bidirectional partner finding
+            onMarkTooth(number, `${finalId}:${findingState}:${subSelection[0]}`);
+        } else {
+            // Final string: "ID:STATUS:SUB1,SUB2..."
+            onMarkTooth(number, `${finalId}:${findingState}${subSelection.length > 0 ? `:${subSelection.join(',')}` : ''}`);
+        }
+
+        setSelectedFinding(null);
+        setSubSelection([]);
+        onClose(); // Close the modal after applying
     };
 
+    const isReadOnly = activeMode === 'INITIAL' && tooth.saved;
+
+    // Sub-select configurations
+    const getSubOptions = () => {
+        if (!selectedFinding) return null;
+        if (selectedFinding.id === 'MOB') return ['M1', 'M2', 'M3'];
+        if (['TC', 'PC', 'PP'].includes(selectedFinding.id)) return ['TC', 'PC', 'PP'];
+        if (selectedFinding.id === 'FUS' || selectedFinding.id === 'TRA' || selectedFinding.id === 'SUPERNUMERARY') {
+            const neighbors = [];
+            const pos = ALL_TEETH.indexOf(number);
+
+            // Basic neighbors in the list
+            if (pos > 0) neighbors.push(ALL_TEETH[pos - 1]);
+            if (pos < ALL_TEETH.length - 1) neighbors.push(ALL_TEETH[pos + 1]);
+
+            // Filter to only kept neighbors in same row (upper vs lower)
+            const isU = isUpper(number);
+            const validNeighbors = neighbors.filter(n => isUpper(n) === isU);
+
+            // Manual overlaps for center teeth
+            if (number === 11 && !validNeighbors.includes(21)) validNeighbors.push(21);
+            if (number === 21 && !validNeighbors.includes(11)) validNeighbors.push(11);
+            if (number === 31 && !validNeighbors.includes(41)) validNeighbors.push(41);
+            if (number === 41 && !validNeighbors.includes(31)) validNeighbors.push(31);
+            if (number === 51 && !validNeighbors.includes(61)) validNeighbors.push(61);
+            if (number === 61 && !validNeighbors.includes(51)) validNeighbors.push(51);
+            if (number === 71 && !validNeighbors.includes(81)) validNeighbors.push(81);
+            if (number === 81 && !validNeighbors.includes(71)) validNeighbors.push(71);
+
+            return [...new Set(validNeighbors)].map(String);
+        }
+        if (['OFJ', 'ORE', 'PF', 'PR', 'PT', 'EDENTULO'].includes(selectedFinding.id)) {
+            const isU = isUpper(number);
+            const isP = isPrimary(number);
+            return ALL_TEETH.filter(n => isUpper(n) === isU && isPrimary(n) === isP).map(String);
+        }
+        if (selectedFinding.group === 'POSITION' && !['MISSING', 'ERUPTION', 'FUS', 'GEM', 'GIR', 'TRA', 'CLAV', 'DIAST', 'SUPERNUMERARY', 'EDENTULO'].includes(selectedFinding.id)) {
+            return ['M', 'D', 'V', 'P', 'L'];
+        }
+        return null;
+    };
+
+    const subOptions = getSubOptions();
+
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="bg-white w-full max-w-4xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white w-full max-w-7xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-slate-100"
             >
                 {/* Header */}
-                <div className="p-8 bg-gradient-to-r from-slate-50 to-white border-b flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-blue-200">
+                <div className="p-10 bg-white border-b border-slate-100 flex justify-between items-center">
+                    <div className="flex items-center gap-6">
+                        <div className="w-16 h-16 bg-blue-600 rounded-[24px] flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-blue-100/50">
                             {number}
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-slate-800">Gestión de Pieza Dental</h2>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mt-1">
-                                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" /> Detalle Clínico FDI
-                            </p>
+                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Gestión de Pieza Dental</h2>
+                            <div className="flex items-center gap-2 mt-1.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    DETALLE CLÍNICO FDI
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-3 hover:bg-slate-100 rounded-2xl transition-all text-slate-400 hover:text-slate-600 active:scale-95">
-                        <X size={24} />
+                    <button onClick={onClose} className="p-3 hover:bg-slate-50 rounded-2xl transition-all text-slate-300">
+                        <X size={28} />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 custom-scrollbar">
-                    {/* Left Column: Interactive Map */}
-                    <div className="space-y-6">
-                        <div className="bg-slate-50/50 rounded-3xl border border-slate-100 p-6">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Mapa de Superficies</h3>
-                            <div className="flex justify-center py-4">
-                                <div className="relative w-36 h-36 flex items-center justify-center">
+                <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 lg:grid-cols-12 gap-10 custom-scrollbar">
+                    {/* Col 1: Surface & Selectors (3 cols) */}
+                    <div className="lg:col-span-3 space-y-8">
+                        <div className="bg-slate-50/50 rounded-[32px] border border-slate-100 p-8 shadow-inner">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
+                                <Box size={14} /> MAPA DE SUPERFICIES
+                            </h3>
+                            <div className="flex justify-center py-6">
+                                <div className="relative w-40 h-40">
                                     {['V', 'L', 'M', 'D', 'O'].map(s => (
                                         <button
                                             key={s}
-                                            onClick={() => onMarkSurface(number, s)}
+                                            disabled={isReadOnly}
+                                            onClick={() => onMarkSurface(number, s, selectedFinding?.id ? `${selectedFinding.id}:${findingState}` : null)}
                                             className={cn(
-                                                "absolute border-2 transition-all flex items-center justify-center text-[11px] font-black shadow-sm",
+                                                "absolute border-2 transition-all flex items-center justify-center text-[12px] font-black shadow-sm",
                                                 tooth.surfaces[s]?.length > 0
-                                                    ? "bg-blue-600 border-blue-700 text-white shadow-blue-200 scale-105"
-                                                    : "bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:scale-105"
+                                                    ? "bg-blue-600 border-blue-700 text-white shadow-lg scale-110 z-20"
+                                                    : "bg-white border-slate-200 text-slate-400 hover:border-blue-400 hover:scale-105"
                                             )}
                                             style={{
-                                                width: '36px', height: '36px', borderRadius: '10px',
+                                                width: '42px', height: '42px', borderRadius: '12px',
                                                 top: s === 'V' ? '0' : (s === 'L' ? 'auto' : '50%'),
                                                 bottom: s === 'L' ? '0' : 'auto',
-                                                left: s === 'M' ? '0' : (s === 'D' ? 'auto' : '50%'),
+                                                left: (s === 'V' || s === 'L' || s === 'O') ? '50%' : (s === 'M' ? '0' : 'auto'),
                                                 right: s === 'D' ? '0' : 'auto',
                                                 transform: (s === 'V' || s === 'L') ? 'translateX(-50%)' : ((s === 'M' || s === 'D') ? 'translateY(-50%)' : 'translate(-50%, -50%)'),
-                                                zIndex: s === 'O' ? 10 : 5
+                                                zIndex: s === 'O' ? 10 : 5,
                                             }}
                                         >
                                             {s}
@@ -405,147 +540,231 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTooth, onMarkSurface, 
                                     ))}
                                 </div>
                             </div>
-                            <p className="text-[9px] text-center text-slate-400 mt-6 font-bold uppercase tracking-tight">V: Vestibular | L: Lingual | M: Mesial | D: Distal</p>
                         </div>
 
                         <div className="space-y-3">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Notas Clínicas</h3>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-2">NOTAS CLÍNICAS</h3>
                             <textarea
-                                value={note}
-                                onChange={e => {
-                                    setNote(e.target.value);
-                                    onSetNote(number, e.target.value);
-                                }}
-                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/10 placeholder:text-slate-300 resize-none h-32 transition-all"
-                                placeholder="Añadir observaciones sobre la pieza..."
+                                value={tooth.notes || ''}
+                                disabled={isReadOnly}
+                                onChange={e => onSetNote(number, e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-[24px] p-5 text-[13px] text-slate-600 focus:outline-none focus:ring-4 focus:ring-blue-100/50 placeholder:text-slate-300 resize-none h-40 transition-all font-medium"
+                                placeholder="Añadir notas diagnósticas..."
                             />
                         </div>
                     </div>
 
-                    {/* Middle Column: Findings & Selector */}
-                    <div className="space-y-6 lg:border-x lg:px-8 border-slate-100">
-                        <div>
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Añadir Condición</h3>
-                            <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar content-start">
-                                {FINDINGS_LIST.map(f => (
-                                    <button
-                                        key={f.id}
-                                        onClick={() => onMarkTooth(number, f.id)}
-                                        className={cn(
-                                            "p-3 rounded-xl border text-[10px] font-bold transition-all text-left flex flex-col gap-1.5",
-                                            tooth.conditions.includes(f.id)
-                                                ? "bg-slate-800 border-slate-900 text-white shadow-lg shadow-slate-200"
-                                                : "bg-white border-slate-100 text-slate-600 hover:border-blue-200 hover:bg-blue-50/30"
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: f.color }} />
-                                            <span className="truncate">{f.label}</span>
-                                        </div>
-                                    </button>
-                                ))}
+                    {/* Col 2: Finding Search & Selection (5 cols) */}
+                    <div className="lg:col-span-5 space-y-6 lg:border-x lg:px-10 border-slate-100">
+                        <div className="space-y-4">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">AÑADIR CONDICIÓN</h3>
+                            <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre o sigla (Ej: CDP, Caries...)"
+                                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 outline-none"
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                />
                             </div>
-                        </div>
 
-                        <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 rounded-xl">
-                                    <ClipboardList size={20} className="text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-blue-400 uppercase italic">Acción Rápida</p>
-                                    <button
-                                        onClick={handleSync}
-                                        disabled={syncing}
-                                        className={cn(
-                                            "text-[11px] font-bold text-blue-700 hover:underline",
-                                            syncing && "opacity-50 cursor-not-allowed"
-                                        )}
-                                    >
-                                        {syncing ? 'Sincronizando...' : 'Sincronizar con Presupuesto'}
-                                    </button>
-                                </div>
+                            <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar space-y-6">
+                                {[
+                                    { id: 'CARIES', label: 'Lesión de Caries' },
+                                    { id: 'DDE', label: 'Defectos de Esmalte' },
+                                    { id: 'RESTORATION', label: 'Restauraciones' },
+                                    { id: 'SEALANT', label: 'Sellantes' },
+                                    { id: 'PULPAR', label: 'Tratamiento Pulpar' },
+                                    { id: 'PROSTHESIS', label: 'Prótesis y Coronas' },
+                                    { id: 'POSITION', label: 'Anomalías y Posición' },
+                                    { id: 'ORTHO', label: 'Ortodoncia' },
+                                    { id: 'OTHERS', label: 'Otros Hallazgos' },
+                                ].map(group => {
+                                    const findingsInGroup = filteredFindings.filter(f => f.group === group.id);
+                                    if (findingsInGroup.length === 0) return null;
+
+                                    return (
+                                        <div key={group.id} className="space-y-3">
+                                            <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-1">{group.label}</h4>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {findingsInGroup.map(f => (
+                                                    <button
+                                                        key={f.id}
+                                                        disabled={isReadOnly}
+                                                        onClick={() => {
+                                                            setSelectedFinding(f);
+                                                            setSubSelection([]);
+                                                        }}
+                                                        className={cn(
+                                                            "p-3 rounded-xl border transition-all text-left flex items-center justify-between group h-full",
+                                                            selectedFinding?.id === f.id
+                                                                ? "bg-slate-900 border-slate-900 text-white shadow-lg"
+                                                                : "bg-white border-slate-100 text-slate-600 hover:border-blue-200"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div
+                                                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                                style={{ backgroundColor: f.color || (f.group === 'CARIES' ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE) }}
+                                                            />
+                                                            <span className="font-bold text-[10px] leading-tight uppercase">{f.label}</span>
+                                                        </div>
+                                                        {selectedFinding?.id === f.id && <Check size={14} className="text-blue-400" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
+
+                            {selectedFinding && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-blue-50 p-6 rounded-[32px] border border-blue-100 mt-4 space-y-6"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[11px] font-black text-blue-700 uppercase tracking-widest">Configurar Estado</p>
+                                        <div className="flex bg-white/50 p-1.5 rounded-2xl border border-blue-100">
+                                            <button
+                                                onClick={() => setFindingState('GOOD')}
+                                                className={cn(
+                                                    "px-4 py-2 rounded-xl text-[10px] font-black transition-all flex items-center gap-2",
+                                                    findingState === 'GOOD' ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                                )}
+                                            >
+                                                <CheckCircle size={14} /> SANO
+                                            </button>
+                                            <button
+                                                onClick={() => setFindingState('BAD')}
+                                                className={cn(
+                                                    "px-4 py-2 rounded-xl text-[10px] font-black transition-all flex items-center gap-2",
+                                                    findingState === 'BAD' ? "bg-white text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                                )}
+                                            >
+                                                <AlertCircle size={14} /> PATOLÓGICO
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {subOptions && (
+                                        <div className="space-y-3">
+                                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Opción de {selectedFinding.label}</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {subOptions.map(opt => (
+                                                    <button
+                                                        key={opt}
+                                                        onClick={() => {
+                                                            if (selectedFinding.group === 'POSITION' || ['OFJ', 'ORE', 'PF', 'PR', 'PT'].includes(selectedFinding.id)) {
+                                                                setSubSelection(prev => prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt]);
+                                                            } else {
+                                                                setSubSelection([opt]);
+                                                            }
+                                                        }}
+                                                        className={cn(
+                                                            "px-4 py-2 rounded-xl text-[11px] font-black border transition-all",
+                                                            subSelection.includes(opt)
+                                                                ? "bg-blue-600 border-blue-700 text-white shadow-md shadow-blue-200"
+                                                                : "bg-white border-blue-100 text-blue-600 hover:bg-blue-100/20"
+                                                        )}
+                                                    >
+                                                        {opt}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={handleApplyFinding}
+                                        className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[12px] font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
+                                    >
+                                        REGISTRAR HALLAZGO
+                                    </button>
+                                </motion.div>
+                            )}
                         </div>
                     </div>
 
-                    {/* Right Column: History & Current */}
-                    <div className="space-y-6">
+                    {/* Col 3: Active Findings & History (4 cols) */}
+                    <div className="lg:col-span-4 space-y-8">
                         <div>
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
-                                Historial Clínico <Activity size={14} className="text-indigo-400" />
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <Activity size={14} className="text-rose-500" /> Hallazgos Activos
                             </h3>
-                            <div className="space-y-3 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar bg-slate-50/30 rounded-3xl p-4 border border-slate-50 shadow-inner">
-                                {toothHistory && toothHistory.length > 0 ? (
-                                    toothHistory.map((log, idx) => (
-                                        <div key={log.id} className="flex gap-4 relative pb-5 last:pb-0">
-                                            {idx !== toothHistory.length - 1 && (
-                                                <div className="absolute top-2 left-[5px] w-[1px] h-full bg-slate-200" />
-                                            )}
-                                            <div className="w-2.5 h-2.5 rounded-full bg-white border-2 border-indigo-400 z-10 mt-1 shadow-sm" />
-                                            <div className="flex-1">
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <p className="text-[10px] font-black text-slate-700 leading-tight flex-1">{log.description}</p>
-                                                    <span className="text-[8px] font-medium text-slate-400 whitespace-nowrap">{new Date(log.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <div className="w-3 h-3 bg-slate-200 rounded-full" />
-                                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{log.doctor?.name}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="py-8 text-center bg-white/50 rounded-2xl border border-dashed border-slate-100">
-                                        <p className="text-[10px] text-slate-300 italic">Sin registros de evolución anteriores.</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Hallazgos Activos</h3>
-                            <div className="space-y-2">
+                            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                 {(() => {
-                                    const allIds = [...(tooth.conditions || [])];
-                                    Object.values(tooth.surfaces || {}).forEach(arr => {
-                                        if (Array.isArray(arr)) allIds.push(...arr);
-                                    });
-                                    const uniqueIds = [...new Set(allIds)].filter(id => id !== 'SELECT');
+                                    const toothConditions = (tooth.conditions || []).map(c => ({ str: c, surface: null }));
+                                    const surfaceConditions = Object.entries(tooth.surfaces || {}).flatMap(([s, items]) =>
+                                        (items || []).map(c => ({ str: c, surface: s }))
+                                    );
+                                    const all = [...toothConditions, ...surfaceConditions];
 
-                                    if (uniqueIds.length === 0) {
-                                        return <p className="text-[10px] text-slate-300 italic pl-2">No hay hallazgos activos.</p>;
-                                    }
+                                    if (all.length === 0) return <p className="text-[11px] text-slate-300 italic pl-2">Ninguno registrado</p>;
 
-                                    return uniqueIds.map(id => {
-                                        const cond = getConditionData(id);
+                                    return all.map((item, idx) => {
+                                        const cond = getConditionData(item.str);
+                                        if (!cond) return null;
                                         return (
-                                            <motion.div
-                                                layout
-                                                key={id}
-                                                className="flex items-center justify-between p-3 bg-slate-50/80 rounded-2xl border border-slate-100 hover:border-slate-200 transition-all group"
-                                            >
+                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50/80 rounded-[24px] border border-slate-100 group">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cond?.color }} />
-                                                    <span className="text-xs font-bold text-slate-700">{cond?.label}</span>
+                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cond.color }} />
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{cond.sigla}</p>
+                                                            {item.surface && (
+                                                                <span className="text-[9px] font-black bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md">{item.surface}</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mt-1 truncate max-w-[140px]">{cond.label}</p>
+                                                    </div>
                                                 </div>
-                                                <button onClick={() => onMarkTooth(number, id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100">
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </motion.div>
+                                                {!isReadOnly && (
+                                                    <button
+                                                        onClick={() => item.surface ? onMarkSurface(number, item.surface, item.str) : onMarkTooth(number, item.str)}
+                                                        className="text-slate-200 hover:text-rose-500 transition-colors"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         );
                                     });
                                 })()}
                             </div>
                         </div>
+
+                        <div>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <History size={14} className="text-indigo-400" /> Historial Clínico
+                            </h3>
+                            <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                                {toothHistory && toothHistory.length > 0 ? (
+                                    toothHistory.map((log) => (
+                                        <div key={log.id} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <p className="text-[10px] font-black text-slate-700 leading-tight">{log.description}</p>
+                                                <span className="text-[9px] font-bold text-slate-400">{new Date(log.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                            <p className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">{log.doctor?.name}</p>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
+                                        <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Sin antecedentes</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="p-6 bg-slate-50 border-t flex justify-end">
+                <div className="p-8 bg-white border-t border-slate-100 flex justify-end">
                     <button
                         onClick={onClose}
-                        className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-[12px] font-black hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95"
+                        className="px-12 py-3.5 bg-slate-900 text-white rounded-xl text-[12px] font-black hover:bg-black transition-all shadow-lg active:scale-95 uppercase tracking-widest"
                     >
                         LISTO
                     </button>
@@ -606,28 +825,26 @@ const EvolutionPopover = ({ anchor, onClose, onSelect, currentState }) => {
 const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIAL' }) => {
     const isUpperTooth = isUpper(number);
     const isMolarTooth = isMolar(number);
-    const isPremolarTooth = isPremolar(number);
 
-    const W = 55;
-    const H = 110; // Slightly more height for anatomical roots
-    const padding = 4;
+    // COP Proportions: Crown approx 0.5cm2 visual. 
+    // We increase W slightly to give more presence.
+    const W = 62;
+    const H = 100;
+    const padding = 2;
 
-    // Crown dimensions (Anatomical)
-    const cH = 42;
+    const cH = 45; // Crown height
     const cW = W - (padding * 2);
-    const cY = isUpperTooth ? H - cH - 5 : 5; // Leave space for boxes
 
-    // Root dimensions
-    const rY = isUpperTooth ? 5 : cH + 5;
-    const rH = H - cH - 15;
+    // Orientation: Upper teeth have roots ABOVE crown. Lower teeth have roots BELOW crown.
+    const cY = isUpperTooth ? H - cH - 5 : 5;
 
     const mx = W / 2;
     const my = cY + (cH / 2);
-    const offset = 9;
+    const offset = 10;
 
-    // Anatomical Crown Shape (Trapezoidal)
-    const crownTopWidth = isUpperTooth ? cW : cW * 0.8;
-    const crownBottomWidth = isUpperTooth ? cW * 0.8 : cW;
+    // COP Crown Shape (Sharp Trapezoid)
+    const crownTopWidth = isUpperTooth ? cW : cW * 0.7;
+    const crownBottomWidth = isUpperTooth ? cW * 0.7 : cW;
     const ctL = mx - (crownTopWidth / 2);
     const ctR = mx + (crownTopWidth / 2);
     const cbL = mx - (crownBottomWidth / 2);
@@ -635,7 +852,7 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
 
     const crownPoints = `${ctL},${cY} ${ctR},${cY} ${cbR},${cY + cH} ${cbL},${cY + cH}`;
 
-    // Surfaces polygons (adjusted for anatomical crown)
+    // COP Surface Cross Map (5 sectors)
     const surf = {
         V: isUpperTooth
             ? `${ctL},${cY} ${ctR},${cY} ${mx},${my}`
@@ -643,196 +860,385 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
         L: isUpperTooth
             ? `${cbL},${cY + cH} ${cbR},${cY + cH} ${mx},${my}`
             : `${ctL},${cY} ${ctR},${cY} ${mx},${my}`,
-        M: isUpperTooth
-            ? `${ctL},${cY} ${cbL},${cY + cH} ${mx},${my}`
-            : `${ctL},${cY} ${cbL},${cY + cH} ${mx},${my}`,
-        D: isUpperTooth
-            ? `${ctR},${cY} ${cbR},${cY + cH} ${mx},${my}`
-            : `${ctR},${cY} ${cbR},${cY + cH} ${mx},${my}`,
+        M: `${ctL},${cY} ${cbL},${cY + cH} ${mx},${my}`,
+        D: `${ctR},${cY} ${cbR},${cY + cH} ${mx},${my}`,
         O: `${mx - offset},${my - offset} ${mx + offset},${my - offset} ${mx + offset},${my + offset} ${mx - offset},${my + offset}`,
     };
 
-    // Root Polygons (Anatomical)
+    // COP Anatomy: Molar multiple roots (sharp), Anterior single.
     let roots = [];
     if (isUpperTooth) {
         const rootBaseY = cY;
-        const rootTopY = 5;
+        const rootTopY = 2; // Sharp tip at top
         if (isMolarTooth) {
             roots = [
-                `${ctL},${rootBaseY} ${ctL - 2},${rootTopY} ${ctL + cW / 3},${rootBaseY}`,
-                `${mx - 4},${rootBaseY} ${mx},${rootTopY - 2} ${mx + 4},${rootBaseY}`,
-                `${ctR - cW / 3},${rootBaseY} ${ctR + 2},${rootTopY} ${ctR},${rootBaseY}`
+                `${ctL},${rootBaseY} ${ctL - 4},${rootTopY} ${ctL + cW / 4},${rootBaseY}`,
+                `${mx},${rootBaseY} ${mx},${rootTopY - 2} ${mx + 5},${rootBaseY}`,
+                `${ctR - cW / 4},${rootBaseY} ${ctR + 4},${rootTopY} ${ctR},${rootBaseY}`
             ];
-        } else if ([14, 15, 24, 25].includes(number)) {
+        } else if ([14, 24].includes(number)) { // 1st Premolars usually 2 roots
             roots = [
-                `${ctL + 2},${rootBaseY} ${mx - 5},${rootTopY} ${mx},${rootBaseY}`,
-                `${mx},${rootBaseY} ${mx + 5},${rootTopY} ${ctR - 2},${rootBaseY}`
+                `${ctL + 4},${rootBaseY} ${mx - 6},${rootTopY} ${mx},${rootBaseY}`,
+                `${mx},${rootBaseY} ${mx + 6},${rootTopY} ${ctR - 4},${rootBaseY}`
             ];
         } else {
-            roots = [`${ctL + 5},${rootBaseY} ${mx},${rootTopY} ${ctR - 5},${rootBaseY}`];
+            roots = [`${ctL + 8},${rootBaseY} ${mx},${rootTopY} ${ctR - 8},${rootBaseY}`];
         }
     } else {
         const rootBaseY = cY + cH;
-        const rootBottomY = H - 5;
+        const rootBottomY = H - 2;
         if (isMolarTooth) {
             roots = [
-                `${cbL},${rootBaseY} ${cbL - 2},${rootBottomY} ${mx},${rootBaseY}`,
-                `${mx},${rootBaseY} ${cbR + 2},${rootBottomY} ${cbR},${rootBaseY}`
+                `${cbL},${rootBaseY} ${cbL - 4},${rootBottomY} ${mx},${rootBaseY}`,
+                `${mx},${rootBaseY} ${cbR + 4},${rootBottomY} ${cbR},${rootBaseY}`
             ];
         } else {
-            roots = [`${cbL + 5},${rootBaseY} ${mx},${rootBottomY} ${cbR - 5},${rootBaseY}`];
+            roots = [`${cbL + 8},${rootBaseY} ${mx},${rootBottomY} ${cbR - 8},${rootBaseY}`];
         }
     }
 
-    const missing = (data?.conditions || []).some(c => c.startsWith('MISSING'));
     const allConditions = (data?.conditions || []).map(c => getConditionData(c)).filter(Boolean);
-    const borderColor = isSelected ? '#3b82f6' : '#94a3b8';
-    const borderWidth = isSelected ? 2 : 1.2;
+    const hasFusion = allConditions.some(c => c.id === 'FUS');
+    const hasGem = allConditions.some(c => c.id === 'GEM');
+    const borderColor = isSelected ? PROTOCOL_COLORS.BLUE : '#94a3b8';
 
-    const tooltipText = `Diente ${number}\n${allConditions.map(c => c.label).join(', ')}`;
+    // Box sigles
+    const boxSigles = getStatusLetter(data);
+    const topSigles = isUpperTooth ? boxSigles : [];
+    const bottomSigles = !isUpperTooth ? boxSigles : [];
 
     return (
-        <div className="flex flex-col items-center select-none group relative" title={tooltipText} style={{ width: W }}>
-            {/* Top Status Box */}
-            <div className={cn(
-                "w-8 h-8 border border-slate-300 mb-1 flex items-center justify-center text-[11px] font-black bg-white transition-colors",
-                getStatusLetter(data) ? "text-red-500 border-red-200" : "text-slate-300"
-            )}>
-                {isUpperTooth ? getStatusLetter(data) : ''}
-            </div>
+        <div
+            className="flex flex-col items-center select-none group relative py-2 cursor-pointer"
+            style={{ width: W }}
+            onClick={(e) => onTooth(number, e)}
+        >
+            {isUpperTooth && (
+                <>
+                    <div className={cn(
+                        "w-10 h-10 border border-slate-300 mb-2 flex flex-col items-center justify-center bg-white transition-all overflow-hidden",
+                        topSigles.length > 0 ? "border-slate-400 shadow-sm" : "opacity-40"
+                    )}>
+                        {topSigles.slice(0, 2).map((s, i) => (
+                            <span key={i} className="text-[10px] font-black leading-tight" style={{ color: s.color }}>{s.sigla}</span>
+                        ))}
+                    </div>
+                    <div className={cn("w-full py-1 my-1 flex justify-center transition-all border-y border-slate-100 relative", isSelected ? "bg-blue-600 text-white border-blue-700" : "bg-slate-50 text-slate-900")}>
+                        {(hasFusion || hasGem) && (
+                            <div className="absolute inset-y-[-6px] -inset-x-3 border-2 border-blue-600/80 rounded-full pointer-events-none z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.8)]" />
+                        )}
+                        <span className="text-[11px] font-black">{number}</span>
+                    </div>
+                </>
+            )}
 
-            {/* Tooth Number Box */}
-            <div className={cn(
-                "w-full py-0.5 mb-1 flex justify-center transition-all border border-slate-200",
-                data?.evolutionState === 'CURADO' ? "bg-green-500 border-green-600 text-white" :
-                    data?.evolutionState === 'PENDIENTE' ? "bg-amber-500 border-amber-600 text-white" :
-                        data?.evolutionState === 'CANCELADO' ? "bg-slate-400 border-slate-500 text-white" :
-                            "bg-slate-50 text-slate-500"
-            )}>
-                <span className="text-[10px] font-black">{number}</span>
-            </div>
-
+            {/* 2. Gráfico Dental (SVG) */}
             <svg
                 width={W} height={H}
                 viewBox={`0 0 ${W} ${H}`}
-                className={cn("block cursor-pointer overflow-visible")}
-                onClick={(e) => onTooth(number, e)}
+                className={cn("block overflow-visible pointer-events-none relative z-10")}
             >
                 {/* Roots */}
                 {roots.map((r, i) => (
-                    <polygon key={i} points={r} fill="none" stroke={borderColor} strokeWidth={borderWidth} />
+                    <polygon key={i} points={r} fill="none" stroke={borderColor} strokeWidth="1.2" />
                 ))}
 
                 {/* Crown Border */}
                 <polygon
                     points={crownPoints}
                     fill="white"
-                    stroke={borderColor} strokeWidth={borderWidth}
+                    stroke={borderColor} strokeWidth="1.2"
                 />
 
-                {missing || (data?.conditions || []).includes('MISSING') ? (
-                    <g stroke="#ef4444" strokeWidth={2} strokeLinecap="round">
-                        <line x1={8} y1={cY + 8} x2={W - 8} y2={cY + cH - 8} />
-                        <line x1={W - 8} y1={cY + 8} x2={8} y2={cY + cH - 8} />
-                    </g>
-                ) : (
-                    <g>
-                        {['V', 'L', 'M', 'D', 'O'].map(s => {
-                            const fill = sc(data, s);
-                            const items = data?.surfaces[s] || [];
-                            const isSealant = items.includes('SEALANT');
-
-                            return (
-                                <g key={s}>
-                                    <polygon points={surf[s]}
-                                        fill={fill || "transparent"}
-                                        onClick={e => { e.stopPropagation(); onSurface(number, s, e); }}
-                                        className="hover:fill-blue-50/50 transition-colors"
-                                    />
-                                    {isSealant && (
-                                        <circle cx={s === 'O' ? mx : (s === 'M' ? ctL + 5 : (s === 'D' ? ctR - 5 : mx))}
-                                            cy={s === 'O' ? my : (s === 'V' ? (isUpperTooth ? cY + 5 : cY + cH - 5) : my)}
-                                            r="3" fill="#86efac" className="pointer-events-none" />
-                                    )}
-                                </g>
-                            );
-                        })}
-
-                        {/* Surface Inner Borders */}
-                        {['V', 'L', 'M', 'D'].map(s => (
-                            <polygon key={`b${s}`} points={surf[s]}
-                                fill="none" stroke="#e2e8f0" strokeWidth="0.5"
-                                className="pointer-events-none"
+                {/* Drawings Overlay */}
+                <g>
+                    {['V', 'L', 'M', 'D', 'O'].map(s => {
+                        const fill = sc(data, s);
+                        return (
+                            <polygon key={s} points={surf[s]}
+                                fill={fill || "transparent"}
+                                onClick={e => { e.stopPropagation(); onSurface(number, s, e); }}
+                                className="hover:fill-blue-50/50 transition-colors"
+                                stroke="#e2e8f0" strokeWidth="0.5"
                             />
-                        ))}
-                        <polygon points={surf.O} fill="none" stroke="#e2e8f0" strokeWidth="0.5" className="pointer-events-none" />
+                        );
+                    })}
 
-                        {/* Anatomical Grid / Fissures */}
-                        {isMolarTooth && (
-                            <path d={`M${mx - 5},${my - 5} L${mx + 5},${my + 5} M${mx + 5},${my - 5} L${mx - 5},${my + 5}`}
-                                stroke="#e2e8f0" strokeWidth="0.5" className="pointer-events-none" />
-                        )}
+                    {/* Fissures for Molars */}
+                    {isMolarTooth && (
+                        <path d={`M${mx - 6},${my - 6} L${mx + 6},${my + 6} M${mx + 6},${my - 6} L${mx - 6},${my + 6}`}
+                            stroke="#e2e8f0" strokeWidth="0.5" className="pointer-events-none" />
+                    )}
 
-                        {/* Overlays Section */}
-                        {allConditions.map((cond, idx) => {
-                            const color = cond.color;
-                            const isUpper = isUpperTooth;
+                    {/* Condition Drawings */}
+                    {allConditions.map((cond, idx) => {
+                        if (cond.type !== 'drawing') return null;
+                        const color = cond.color;
 
-                            switch (cond.id) {
-                                case 'CROWN':
-                                    return (
-                                        <polygon key={idx} points={crownPoints}
-                                            fill="none" stroke={color} strokeWidth="3" />
-                                    );
-                                case 'EXTRACTION':
-                                    return (
-                                        <g key={idx}>
-                                            <path d={`M${mx},${isUpper ? cY - 12 : cY + cH + 12} v${isUpper ? 25 : -25} l-6,${isUpper ? -8 : 8} m6,${isUpper ? 8 : -8} l6,${isUpper ? -8 : 8}`}
-                                                fill="none" stroke={color} strokeWidth="3" />
-                                        </g>
-                                    );
-                                case 'IMPACTED':
-                                    return (
-                                        <circle key={idx} cx={mx} cy={my} r={cH / 2} fill="none" stroke={color} strokeWidth="2" strokeDasharray="3,2" />
-                                    );
-                                case 'IMPLANT':
-                                    return (
-                                        <g key={idx}>
-                                            <rect x={mx - 3} y={isUpper ? 5 : H - 30} width={6} height={25} fill={color} rx="1" />
-                                            {[...Array(5)].map((_, i) => (
-                                                <line key={i} x1={mx - 3} y1={(isUpper ? 8 : H - 27) + i * 4} x2={mx + 3} y2={(isUpper ? 10 : H - 25) + i * 4} stroke="white" strokeWidth="0.5" />
-                                            ))}
-                                        </g>
-                                    );
-                                case 'BRIDGE':
-                                    return (
-                                        <line key={idx} x1={-5} y1={my} x2={W + 5} y2={my} stroke={color} strokeWidth="4" />
-                                    );
-                                case 'ROOTCANAL':
-                                    return (
-                                        <g key={idx}>
-                                            {roots.map((r, i) => {
-                                                const p = r.split(' ');
-                                                const tip = p[1].split(',');
-                                                return <line key={i} x1={mx} y1={my} x2={tip[0]} y2={tip[1]} stroke={color} strokeWidth="3" strokeLinecap="round" />;
-                                            })}
-                                        </g>
-                                    );
-                                default:
-                                    return null;
+                        switch (cond.visual) {
+                            case 'circle_full':
+                                return <polygon key={idx} points={crownPoints} fill="none" stroke={color} strokeWidth="3" />;
+                            case 'rect_full': // Corona Temporal Square
+                                return <rect key={idx} x={mx - cW / 2} y={cY} width={cW} height={cH} fill="none" stroke={color} strokeWidth="3" />;
+                            case 'bridge_line':
+                                return <line key={idx} x1={-5} y1={my} x2={W + 5} y2={my} stroke={color} strokeWidth="4" />;
+                            case 'cross_big':
+                                return (
+                                    <g key={idx} stroke={color} strokeWidth={3} strokeLinecap="round">
+                                        <line x1={5} y1={cY + 5} x2={W - 5} y2={cY + cH - 5} />
+                                        <line x1={W - 5} y1={cY + 5} x2={5} y2={cY + cH - 5} />
+                                    </g>
+                                );
+                            case 'screw':
+                                return <rect key={idx} x={mx - 4} y={isUpperTooth ? 5 : H - 35} width={8} height={10} fill={color} rx="1" />;
+                            case 'root_line':
+                                return (
+                                    <g key={idx}>
+                                        {roots.map((r, i) => {
+                                            const tip = r.split(' ')[1].split(',');
+                                            return <line key={i} x1={mx} y1={my} x2={tip[0]} y2={tip[1]} stroke={color} strokeWidth="3.5" strokeLinecap="round" />;
+                                        })}
+                                    </g>
+                                );
+                            case 'coronal_pulp':
+                                return (
+                                    <rect key={idx} x={mx - 10} y={my - 10} width={20} height={20} fill={color} />
+                                );
+                            case 'arrow_extrude': {
+                                // Pointing occlusal (AWAY from roots): Down for upper, Up for lower
+                                const arrowY = isUpperTooth ? cY + cH + 5 : cY - 5;
+                                const dir = isUpperTooth ? 15 : -15;
+                                return (
+                                    <path
+                                        key={idx}
+                                        d={`M${mx},${arrowY} v${dir} l-5,${isUpperTooth ? -5 : 5} m5,${isUpperTooth ? 5 : -5} l5,${isUpperTooth ? -5 : 5}`}
+                                        fill="none" stroke={color} strokeWidth="3"
+                                    />
+                                );
                             }
-                        })}
-                    </g>
-                )}
+                            case 'arrow_intrude': {
+                                // Pointing apical (TOWARDS roots): Up for upper, Down for lower
+                                const arrowY = isUpperTooth ? cY + cH + 5 : cY - 5;
+                                const dir = isUpperTooth ? -15 : 15;
+                                return (
+                                    <path
+                                        key={idx}
+                                        d={`M${mx},${arrowY} v${dir} l-5,${isUpperTooth ? 5 : -5} m5,${isUpperTooth ? -5 : 5} l5,${isUpperTooth ? 5 : -5}`}
+                                        fill="none" stroke={color} strokeWidth="3"
+                                    />
+                                );
+                            }
+                            case 'supernumerary_partner': {
+                                // Circle with S between apices
+                                const parts = cond.id.split(':');
+                                const partnerID = parts[2];
+                                let pIdx = -1;
+                                let nIdx = ALL_TEETH.indexOf(number);
+                                if (partnerID) pIdx = ALL_TEETH.indexOf(parseInt(partnerID));
+
+                                if (pIdx === -1) return null;
+                                const dist = (pIdx - nIdx) * (W + 4);
+                                const cx = mx + dist / 2;
+                                const cy = isUpperTooth ? 0 : H;
+
+                                return (
+                                    <g key={idx}>
+                                        <circle cx={cx} cy={cy} r={10} fill="white" stroke={color} strokeWidth="2" />
+                                        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="black" fill={color}>S</text>
+                                    </g>
+                                );
+                            }
+                            case 'edentulous_range': {
+                                // Line crossing crowns (NTS N°150 5.3.10)
+                                const etY = isUpperTooth ? my + 25 : my - 25;
+                                return (
+                                    <line
+                                        key={idx}
+                                        x1={-3} y1={etY} x2={W + 3} y2={etY}
+                                        stroke={color} strokeWidth="4"
+                                    />
+                                );
+                            }
+                            case 'zigzag_arrow':
+                                return <path key={idx} d={`M${mx - 5},${cY - 20} l5,5 l-5,5 l5,5 v5`} fill="none" stroke={color} strokeWidth="2" />;
+                            case 'surface_mark': // Sellante (S)
+                                return <circle key={idx} cx={mx} cy={my} r={4} fill="none" stroke={color} strokeWidth="1.5" />;
+                            case 'dotted_line': // PR
+                                return <line key={idx} x1={0} y1={my} x2={W} y2={my} stroke={color} strokeWidth="2" strokeDasharray="4 2" />;
+                            case 'curve_arrow': // Giroversión
+                                return <path key={idx} d={`M${mx - 10},${cY - 5} Q${mx},${cY - 15} ${mx + 10},${cY - 5} m-3,0 l3,3 l3,-3`} fill="none" stroke={color} strokeWidth="2" />;
+                            case 'cross_arrows': { // Transposición
+                                // Crossing curved arrows at the level of the tooth numbers
+                                // Format: TRA:STATUS:PARTNER
+                                const parts = cond.id.split(':');
+                                const partnerID = parts[2];
+                                let pIdx = -1;
+                                let nIdx = ALL_TEETH.indexOf(number);
+
+                                if (partnerID) {
+                                    pIdx = ALL_TEETH.indexOf(parseInt(partnerID));
+                                }
+
+                                const ty = isUpperTooth ? H + 12 : -12;
+                                const dist = pIdx !== -1 ? (pIdx - nIdx) * (W + 4) : 0;
+
+                                // To match official diagram:
+                                // Tooth on the "left" (lower index) draws the TOP arrow pointing right.
+                                // Tooth on the "right" (higher index) draws the BOTTOM arrow pointing left.
+                                const isLeftTooth = pIdx > nIdx;
+
+                                if (pIdx === -1) return null; // No partner, no arrow
+
+                                return (
+                                    <g key={idx} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                        {isLeftTooth ? (
+                                            /* Top Arrow (for upper) / Bottom (for lower) */
+                                            <path d={`M ${mx} ${ty} Q ${mx + dist / 2} ${isUpperTooth ? ty + 12 : ty - 12} ${mx + dist} ${ty} l -5 ${isUpperTooth ? -5 : 5} m 5 ${isUpperTooth ? 5 : -5} l -5 ${isUpperTooth ? 5 : -5}`} />
+                                        ) : (
+                                            <path d={`M ${mx} ${ty} Q ${mx + dist / 2} ${isUpperTooth ? ty - 12 : ty + 12} ${mx + dist} ${ty} l 5 ${isUpperTooth ? -5 : 5} m -5 ${isUpperTooth ? 5 : -5} l 5 ${isUpperTooth ? 5 : -5}`} />
+                                        )}
+                                    </g>
+                                );
+                            }
+                            case 'slash_line': // Fractura
+                                return <path key={idx} d={`M${mx - 15},${my - 5} l10,10 l10,-10 l5,10`} fill="none" stroke={color} strokeWidth="2" />;
+                            case 'diastema_parenthesis':
+                                return (
+                                    <g key={idx} stroke={color} strokeWidth={2}>
+                                        <path d={`M0,${my - 10} Q-5,${my} 0,${my + 10}`} />
+                                        <path d={`M${W},${my - 10} Q${W + 5},${my} ${W},${my + 10}`} />
+                                    </g>
+                                );
+                            case 'number_fusion': // Fusión logic is in the number div below
+                                return null;
+                            case 'circle_over_number': // Geminación logic is in the number div below
+                                return null;
+                            case 'ortho_range':
+                            case 'bridge_range': {
+                                const isAnchor = cond.id.endsWith(':ANCHOR');
+                                const apexY = isUpperTooth ? 2 : H - 2;
+                                const isOrtho = cond.id.startsWith('OFJ');
+                                const squareSize = 10;
+
+                                return (
+                                    <g key={idx}>
+                                        <line
+                                            x1={-3} y1={apexY} x2={W + 3} y2={apexY}
+                                            stroke={color} strokeWidth="4"
+                                        />
+                                        {/* PF (Bridge) and OFJ (Ortho) both use vertical tags on anchors */}
+                                        {isAnchor && (
+                                            <line
+                                                x1={mx} y1={apexY - 6} x2={mx} y2={apexY + 6}
+                                                stroke={color} strokeWidth="4"
+                                            />
+                                        )}
+                                        {/* Only OFJ uses the square marker */}
+                                        {isAnchor && isOrtho && (
+                                            <g>
+                                                <rect
+                                                    x={mx - squareSize / 2} y={apexY - squareSize / 2}
+                                                    width={squareSize} height={squareSize}
+                                                    fill="white" stroke={color} strokeWidth="2.5"
+                                                />
+                                                <line x1={mx - 3} y1={apexY} x2={mx + 3} y2={apexY} stroke={color} strokeWidth="2" />
+                                                <line x1={mx} y1={apexY - 3} x2={mx} y2={apexY + 3} stroke={color} strokeWidth="2" />
+                                            </g>
+                                        )}
+                                    </g>
+                                );
+                            }
+
+                            case 'ortho_zigzag': {
+                                const apexY = isUpperTooth ? 2 : H - 2;
+                                const segments = 8;
+                                const dx = (W + 6) / segments;
+                                let path = `M -3 ${apexY}`;
+                                for (let i = 1; i <= segments; i++) {
+                                    const x = -3 + i * dx;
+                                    const y = apexY + (i % 2 === 0 ? -4 : 4);
+                                    path += ` L ${x} ${y}`;
+                                }
+                                return (
+                                    <path
+                                        key={idx}
+                                        d={path}
+                                        fill="none"
+                                        stroke={color}
+                                        strokeWidth="4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                );
+                            }
+
+                            case 'dotted_range': {
+                                const apexY = isUpperTooth ? 2 : H - 2;
+                                return (
+                                    <line
+                                        key={idx}
+                                        x1={-3} y1={apexY} x2={W + 3} y2={apexY}
+                                        stroke={color} strokeWidth="4"
+                                        strokeDasharray="6,4"
+                                    />
+                                );
+                            }
+
+                            case 'parallel_lines_apex': {
+                                // Two parallel horizontal lines at the level of the apices
+                                const paY = isUpperTooth ? 2 : H - 2;
+                                const offset = 4;
+                                return (
+                                    <g key={idx}>
+                                        <line x1={-3} y1={paY - offset / 2} x2={W + 3} y2={paY - offset / 2} stroke={color} strokeWidth="3" />
+                                        <line x1={-3} y1={paY + offset / 2} x2={W + 3} y2={paY + offset / 2} stroke={color} strokeWidth="3" />
+                                    </g>
+                                );
+                            }
+
+                            case 'parallel_lines_crown': {
+                                // Two parallel horizontal lines over the crowns
+                                const pcY = isUpperTooth ? -15 : H + 15;
+                                const offset = 4;
+                                return (
+                                    <g key={idx}>
+                                        <line x1={-3} y1={pcY - offset / 2} x2={W + 3} y2={pcY - offset / 2} stroke={color} strokeWidth="3" />
+                                        <line x1={-3} y1={pcY + offset / 2} x2={W + 3} y2={pcY + offset / 2} stroke={color} strokeWidth="3" />
+                                    </g>
+                                );
+                            }
+
+                            default:
+                                return null;
+                        }
+                    })}
+                </g>
             </svg>
 
-            {/* Bottom Status Box */}
-            <div className={cn(
-                "w-8 h-8 border border-slate-300 mt-1 flex items-center justify-center text-[11px] font-black bg-white transition-colors",
-                getStatusLetter(data) ? "text-red-500 border-red-200" : "text-slate-300"
-            )}>
-                {!isUpperTooth ? getStatusLetter(data) : ''}
-            </div>
+            {/* 3. Número de Diente (Solo para inferiores, para superiores se movió arriba) */}
+            {!isUpperTooth && (
+                <div className={cn(
+                    "w-full py-1 my-1 flex justify-center transition-all border-y border-slate-100 relative",
+                    isSelected ? "bg-blue-600 text-white border-blue-700" : "bg-slate-50 text-slate-900"
+                )}>
+                    {(hasFusion || hasGem) && (
+                        <div className="absolute inset-y-[-6px] -inset-x-3 border-2 border-blue-600/80 rounded-full pointer-events-none z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.8)]" />
+                    )}
+                    <span className="text-[11px] font-black">{number}</span>
+                </div>
+            )}
+
+            {/* 4. Recuadro Inferior (Solo para dientes inferiores) */}
+            {!isUpperTooth && (
+                <div className={cn(
+                    "w-10 h-10 border border-slate-300 mt-1 flex flex-col items-center justify-center bg-white transition-all overflow-hidden",
+                    bottomSigles.length > 0 ? "border-slate-400 shadow-sm" : "opacity-40"
+                )}>
+                    {bottomSigles.slice(0, 2).map((s, i) => (
+                        <span key={i} className="text-[10px] font-black leading-tight" style={{ color: s.color }}>{s.sigla}</span>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
@@ -848,6 +1254,7 @@ const Odontograma = ({ patientId }) => {
         fetchOdontogram,
         saveOdontogram,
         resetOdontogram,
+        markTeeth,
         markTooth,
         markSurface,
         setNote,
@@ -855,7 +1262,11 @@ const Odontograma = ({ patientId }) => {
         setSelected,
         activeMode,
         setActiveMode,
-        setEvolutionState
+        setEvolutionState,
+        globalSpecifications,
+        globalObservations,
+        setGlobalSpecifications,
+        setGlobalObservations
     } = useOdontogramStore();
 
     const { user } = useAuth();
@@ -864,7 +1275,6 @@ const Odontograma = ({ patientId }) => {
 
     const [activeOdoTab, setActiveOdoTab] = React.useState('initial');
     const [saved, setSaved] = React.useState(false);
-    const [evolutionPopover, setEvolutionPopover] = React.useState(null);
     const [detailTooth, setDetailTooth] = React.useState(null);
 
     React.useEffect(() => {
@@ -886,33 +1296,14 @@ const Odontograma = ({ patientId }) => {
     );
 
     const onToothClick = (n, e) => {
-        if (activeMode === 'EVOLUTION') {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setEvolutionPopover({
-                anchor: { x: rect.left, y: rect.top + rect.height + 5 },
-                number: n
-            });
-            setSelected(n);
-        } else {
-            setDetailTooth({ number: n, data: teeth[n] });
-            setSelected(n);
-        }
+        // ALWAYS use the comprehensive modal for both modes, as requested
+        setDetailTooth({ number: n, data: teeth[n] });
+        setSelected(n);
     };
 
     const onSurfaceClick = (n, s, e) => {
-        if (activeMode === 'EVOLUTION') {
-            onToothClick(n, e); // In evolution mode, surface click acts like tooth click
-            return;
-        }
         // Redirect surface click to the main tooth detail modal as requested
         onToothClick(n, e);
-    };
-
-
-    const handleEvolutionSelect = (state) => {
-        if (!evolutionPopover) return;
-        setEvolutionState(evolutionPopover.number, state);
-        setEvolutionPopover(null);
     };
 
     const handleExportPDF = () => {
@@ -929,67 +1320,84 @@ const Odontograma = ({ patientId }) => {
     };
 
     const generatePDF = (doc) => {
-        doc.setFontSize(20);
-        doc.text('REPORTE DE ODONTOGRAMA', 105, 20, { align: 'center' });
+        const lineH = 7;
+        let y = 20;
+
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.text('DOCUMENTO OFICIAL: ODONTOGRAMA', 105, y, { align: 'center' });
+        y += 10;
+
         doc.setFontSize(10);
-        doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 30);
-        doc.text(`Modo: ${activeMode === 'INITIAL' ? 'Inicial' : 'Evolución'}`, 20, 35);
+        doc.setFont("helvetica", "normal");
+        doc.text(`TIPO: ${activeMode === 'INITIAL' ? 'ODONTOGRAMA INICIAL' : 'ODONTOGRAMA DE EVOLUCIÓN'}`, 20, y);
+        doc.text(`FECHA: ${new Date().toLocaleDateString('es-PE')}`, 160, y);
+        y += lineH * 2;
 
-        // Simplified visual representation
-        let y = 50;
-        doc.text('REPRESENTACIÓN VISUAL (ESQUEMÁTICA)', 20, y);
-        y += 10;
+        // Visual Table Summary
+        doc.setFont("helvetica", "bold");
+        doc.text('RESUMEN DE PIEZAS CON HALLAZGOS:', 20, y);
+        y += lineH;
 
-        const drawRow = (nums, rowY) => {
-            nums.forEach((n, i) => {
-                const tooth = teeth[n];
-                const x = 20 + (i * 12);
-                doc.setDrawColor(200);
-                doc.rect(x, rowY, 10, 15);
-                doc.setFontSize(6);
-                doc.text(n.toString(), x + 2, rowY + 5);
-
-                if (activeMode === 'EVOLUTION' && tooth.evolutionState) {
-                    const color = tooth.evolutionState === 'CURADO' ? [34, 197, 94] : (tooth.evolutionState === 'PENDIENTE' ? [245, 158, 11] : [148, 163, 184]);
-                    doc.setFillColor(color[0], color[1], color[2]);
-                    doc.rect(x + 1, rowY + 6, 8, 8, 'F');
-                } else if (tooth.conditions.length > 0) {
-                    doc.setFillColor(239, 68, 68);
-                    doc.rect(x + 1, rowY + 6, 8, 8, 'F');
-                }
+        const tableBody = Object.entries(teeth)
+            .filter(([n, t]) => (t.conditions?.length > 0) || Object.values(t.surfaces || {}).some(s => s.length > 0))
+            .map(([n, t]) => {
+                const conds = (t.conditions || []).map(c => getConditionData(c)?.sigla).join(', ');
+                const surfs = Object.entries(t.surfaces || {})
+                    .filter(([s, items]) => items.length > 0)
+                    .map(([s, items]) => `${s}: ${items.map(i => getConditionData(i)?.sigla).join(',')}`)
+                    .join(' | ');
+                return [n, conds || '-', surfs || '-', t.notes || '-'];
             });
-        };
-
-        drawRow(UPPER_RIGHT.concat(UPPER_LEFT), y);
-        drawRow(LOWER_RIGHT.concat(LOWER_LEFT), y + 25);
-
-        y += 60;
-        doc.setFontSize(12);
-        doc.text('DETALLE DE HALLAZGOS', 20, y);
-        y += 10;
-
-        const tableDataPDF = tableData.map(item => [
-            item.n,
-            getConditionData(item.cond)?.label || item.cond,
-            item.surface || 'Pieza',
-            item.notes || '-'
-        ]);
 
         if (window.jspdf?.autoTable) {
             window.jspdf.autoTable(doc, {
                 startY: y,
-                head: [['Diente', 'Hallazgo', 'Ubicación', 'Notas']],
-                body: tableDataPDF,
-                theme: 'grid'
+                head: [['Diente', 'Hallazgos Pieza', 'Hallazgos Superficies', 'Especificaciones']],
+                body: tableBody,
+                theme: 'grid',
+                styles: { fontSize: 8, font: 'helvetica' },
+                headStyles: { fillStyle: 'DF', fillColor: [50, 50, 50] }
             });
+            y = doc.lastAutoTable.finalY + 15;
         } else {
-            tableDataPDF.forEach(row => {
-                doc.text(`${row[0]} - ${row[1]} (${row[2]})`, 20, y);
-                y += 7;
+            y += 5;
+            doc.text('Diente | Hallazgos', 20, y);
+            y += 5;
+            tableBody.forEach(row => {
+                doc.text(`${row[0]} | ${row[1]} | ${row[2]}`, 20, y);
+                y += 5;
             });
+            y += 10;
         }
 
-        doc.save(`Odontograma_${patientId}_${activeMode}.pdf`);
+        // Global Notes
+        if (y > 250) { doc.addPage(); y = 20; }
+        doc.setFont("helvetica", "bold");
+        doc.text('ESPECIFICACIONES GENERALES:', 20, y);
+        y += lineH;
+        doc.setFont("helvetica", "normal");
+        const specLines = doc.splitTextToSize(globalSpecifications || 'Ninguna', 170);
+        doc.text(specLines, 20, y);
+        y += (specLines.length * lineH) + 10;
+
+        if (y > 250) { doc.addPage(); y = 20; }
+        doc.setFont("helvetica", "bold");
+        doc.text('OBSERVACIONES CLÍNICAS:', 20, y);
+        y += lineH;
+        doc.setFont("helvetica", "normal");
+        const obsLines = doc.splitTextToSize(globalObservations || 'Ninguna', 170);
+        doc.text(obsLines, 20, y);
+        y += (obsLines.length * lineH) + 20;
+
+        // Footer validación
+        doc.setFontSize(8);
+        doc.text('__________________________', 50, 280);
+        doc.text('FIRMA DEL ODONTÓLOGO', 55, 285);
+        doc.text('__________________________', 130, 280);
+        doc.text('HUELLA / FIRMA PACIENTE', 135, 285);
+
+        doc.save(`Odontograma_${activeMode}_${new Date().getTime()}.pdf`);
     };
 
 
@@ -1030,22 +1438,14 @@ const Odontograma = ({ patientId }) => {
     return (
         <div className="pt-2">
             <AnimatePresence>
-                {evolutionPopover && (
-                    <div onClick={e => e.stopPropagation()}>
-                        <EvolutionPopover
-                            anchor={evolutionPopover.anchor}
-                            onClose={() => setEvolutionPopover(null)}
-                            currentState={teeth[evolutionPopover.number]?.evolutionState}
-                            onSelect={handleEvolutionSelect}
-                        />
-                    </div>
-                )}
                 {detailTooth && (
                     <ToothDetailModal
                         number={detailTooth.number}
                         tooth={teeth[detailTooth.number]}
                         patientId={patientId}
+                        activeMode={activeMode}
                         onClose={() => setDetailTooth(null)}
+                        onMarkTeeth={markTeeth}
                         onMarkTooth={markTooth}
                         onMarkSurface={markSurface}
                         onSetNote={setNote}
@@ -1053,112 +1453,117 @@ const Odontograma = ({ patientId }) => {
                 )}
             </AnimatePresence>
 
-            {/* ── Top Tabs & Legend ── */}
-            <div className="flex items-center justify-between border-b border-slate-200 mb-8">
+            {/* ── Official Protocol Header ── */}
+            <div className="flex items-center justify-between border-b border-slate-200 mb-6 pb-2">
                 <div className="flex gap-8 items-center">
                     {[
-                        { id: 'INITIAL', label: 'Odo. Inicial' },
-                        { id: 'EVOLUTION', label: 'Odo. Evolución' }
+                        { id: 'INITIAL', label: 'ODONTOGRAMA INICIAL' },
+                        { id: 'EVOLUTION', label: 'ODONTOGRAMA DE EVOLUCIÓN' }
                     ].map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveMode(tab.id)}
                             className={cn(
-                                "pb-3 text-[13px] font-bold transition-all relative",
-                                activeMode === tab.id ? "text-blue-600" : "text-slate-400"
+                                "pb-3 text-[13px] font-black tracking-wider transition-all relative px-2",
+                                activeMode === tab.id ? "text-blue-700" : "text-slate-400"
                             )}>
                             {tab.label}
-                            {activeMode === tab.id && <div className="absolute bottom-0 inset-x-0 h-1 bg-cyan-400" />}
+                            {activeMode === tab.id && <div className="absolute bottom-0 inset-x-0 h-1 bg-blue-600 rounded-t-full" />}
                         </button>
                     ))}
+                </div>
 
-                    <div className="h-4 w-[1px] bg-slate-200 mx-2" />
+                <div className="flex items-center gap-4 text-[13px] font-bold text-slate-700 bg-slate-50 px-6 py-2 rounded-xl border border-slate-200 shadow-inner">
+                    <span className="text-slate-400">FECHA:</span>
+                    <span className="border-b border-slate-400 min-w-[120px] text-center">
+                        {new Date().toLocaleDateString('es-PE')}
+                    </span>
+                </div>
+            </div>
 
-                    <div className="h-4 w-[1px] bg-slate-200 mx-2" />
-                    <div className="text-[11px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 italic shadow-inner">
-                        Vista Mixta (FDI)
+            {/* ── Sub Header: Legend & Actions ── */}
+            <div className="flex items-center justify-between mb-8 px-4">
+                <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 rounded-md bg-[#DC2626] shadow-sm" />
+                        <span className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Patología / Mal Estado</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 rounded-md bg-[#2563EB] shadow-sm" />
+                        <span className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Sano / Buen Estado</span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6 pb-2">
-                    <div className="flex items-center gap-1.5">
-                        <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
-                        <span className="text-[11px] font-bold text-slate-500">Mal estado</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                        <span className="text-[11px] font-bold text-slate-500">Buen estado</span>
-                    </div>
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleExportPDF}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[12px] font-black text-white hover:bg-black transition-all shadow-md active:scale-95"
+                    >
+                        <ClipboardList size={16} /> EXPORTAR PDF (OFICIAL)
+                    </button>
                     <button
                         onClick={() => {
-                            if (window.confirm('¿Estás seguro de que deseas limpiar todo el odontograma? Esta acción no se puede deshacer.')) {
+                            if (window.confirm('¿Deseas limpiar todos los hallazgos? Esta acción es irreversible.')) {
                                 resetOdontogram();
                             }
                         }}
-                        className="px-4 py-1.5 bg-red-50 rounded-lg text-[12px] font-bold text-red-500 hover:bg-red-100 transition-colors border border-red-100">
-                        Nuevo odontog.
-                    </button>
-                    <button className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
-                        <MoreHorizontal size={20} className="rotate-90" />
+                        className="p-2.5 text-red-500 bg-white border border-red-100 rounded-xl hover:bg-red-50 transition-all shadow-sm"
+                    >
+                        <Trash2 size={18} />
                     </button>
                 </div>
-            </div>
-
-            {/* ── Sub Header Buttons ── */}
-            <div className="flex justify-end gap-3 mb-8">
-                <button className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-bold text-slate-600 hover:bg-slate-100 transition-colors">
-                    <Hash size={14} /> Marcado múltiple
-                </button>
-                <button
-                    onClick={async () => {
-                        if (window.confirm('¿Deseas generar un presupuesto automático basado en los hallazgos actuales?')) {
-                            const budget = await createBudgetFromOdontogram(patientId, user?.id, teeth);
-                            if (budget) {
-                                navigate(`/expediente/${patientId}/budgets`);
-                            } else {
-                                alert('No se encontraron hallazgos que requieran tratamiento o no hay servicios configurados.');
-                            }
-                        }
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                    <span className="text-blue-600 font-black">$</span> Crear presupuesto
-                </button>
-                <button
-                    onClick={handleExportPDF}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                    <ClipboardList size={14} /> Exportar PDF
-                </button>
-                <button className="p-2 text-slate-400 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                    <Info size={16} />
-                </button>
             </div>
 
             {/* ── Dental Chart (Integrated Mixed Dentition) ── */}
-            <div className="flex flex-col items-center gap-1 overflow-x-auto py-8 bg-white rounded-[40px] border border-slate-100 shadow-sm min-w-fit">
-                {/* Permanent Upper */}
-                <div className="flex gap-1 mb-2">
-                    <div className="flex gap-1 pr-4 border-r-2 border-slate-100">{renderRow(UPPER_RIGHT, true)}</div>
-                    <div className="flex gap-1 pl-4">{renderRow(UPPER_LEFT, true)}</div>
+            <div className="flex flex-col items-center gap-1 overflow-x-auto py-12 px-10 bg-white rounded-[40px] border border-slate-100 shadow-xl min-w-fit mb-12">
+                {/* Permanent Upper Row (18-11 | 21-28) */}
+                <div className="flex gap-2 mb-4">
+                    <div className="flex gap-1.5 pr-6 border-r-2 border-slate-100">{renderRow(UPPER_RIGHT, true)}</div>
+                    <div className="flex gap-1.5 pl-6">{renderRow(UPPER_LEFT, true)}</div>
                 </div>
 
-                {/* Primary Upper */}
-                <div className="flex gap-1 mb-12">
-                    <div className="flex gap-1 pr-4 border-r-2 border-slate-100">{renderRow(PRIMARY_UPPER_RIGHT, true)}</div>
-                    <div className="flex gap-1 pl-4">{renderRow(PRIMARY_UPPER_LEFT, true)}</div>
+                {/* Primary Upper Row (55-51 | 61-65) */}
+                <div className="flex gap-2 mb-16">
+                    <div className="flex gap-1 pr-6 border-r-2 border-slate-100">{renderRow(PRIMARY_UPPER_RIGHT, true)}</div>
+                    <div className="flex gap-1 pl-6">{renderRow(PRIMARY_UPPER_LEFT, true)}</div>
                 </div>
 
-                {/* Primary Lower */}
-                <div className="flex gap-1 mb-2">
-                    <div className="flex gap-1 pr-4 border-r-2 border-slate-100">{renderRow(PRIMARY_LOWER_RIGHT, false)}</div>
-                    <div className="flex gap-1 pl-4">{renderRow(PRIMARY_LOWER_LEFT, false)}</div>
+                {/* Primary Lower Row (85-81 | 71-75) */}
+                <div className="flex gap-2 mb-4">
+                    <div className="flex gap-1 pr-6 border-r-2 border-slate-100">{renderRow(PRIMARY_LOWER_RIGHT, false)}</div>
+                    <div className="flex gap-1 pl-6">{renderRow(PRIMARY_LOWER_LEFT, false)}</div>
                 </div>
 
-                {/* Permanent Lower */}
-                <div className="flex gap-1">
-                    <div className="flex gap-1 pr-4 border-r-2 border-slate-100">{renderRow(LOWER_RIGHT, false)}</div>
-                    <div className="flex gap-1 pl-4">{renderRow(LOWER_LEFT, false)}</div>
+                {/* Permanent Lower Row (48-41 | 31-38) */}
+                <div className="flex gap-2">
+                    <div className="flex gap-1.5 pr-6 border-r-2 border-slate-100">{renderRow(LOWER_RIGHT, false)}</div>
+                    <div className="flex gap-1.5 pl-6">{renderRow(LOWER_LEFT, false)}</div>
+                </div>
+            </div>
+
+            {/* ── Official Footer: Specifications & Observations ── */}
+            <div className="grid grid-cols-2 gap-8 mb-12">
+                <div className="space-y-3">
+                    <label className="text-[12px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                        <Activity size={14} className="text-blue-600" /> ESPECIFICACIONES
+                    </label>
+                    <textarea
+                        value={globalSpecifications}
+                        onChange={(e) => setGlobalSpecifications(e.target.value)}
+                        className="w-full h-32 p-4 bg-white border border-slate-200 rounded-2xl text-[13px] text-slate-600 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm resize-none"
+                        placeholder="Detalle aquí hallazgos generalizados como Fluorosis, etc."
+                    />
+                </div>
+                <div className="space-y-3">
+                    <label className="text-[12px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                        <Info size={14} className="text-blue-600" /> OBSERVACIONES
+                    </label>
+                    <textarea
+                        value={globalObservations}
+                        onChange={(e) => setGlobalObservations(e.target.value)}
+                        className="w-full h-32 p-4 bg-white border border-slate-200 rounded-2xl text-[13px] text-slate-600 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm resize-none"
+                        placeholder="Observaciones clínicas adicionales..."
+                    />
                 </div>
             </div>
 

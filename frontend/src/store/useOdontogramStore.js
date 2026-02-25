@@ -14,6 +14,52 @@ const defaultTooth = () => ({
 
 const buildState = () => Object.fromEntries(ALL_TEETH.map(n => [n, defaultTooth()]));
 
+const isUpper = n => (n >= 11 && n <= 28) || (n >= 51 && n <= 65);
+const isPrimary = n => n >= 51 && n <= 85;
+
+const RANGE_FINDINGS = ['OFJ', 'ORE', 'PF', 'PR', 'PT'];
+
+const syncRangeArch = (newTeeth, refN, colorState, baseId) => {
+    const isU = isUpper(refN);
+    const isP = isPrimary(refN);
+    const archTeeth = ALL_TEETH.filter(tn => isUpper(tn) === isU && isPrimary(tn) === isP);
+
+    const lineId = `${baseId}_L`;
+    const anchors = archTeeth.filter(tn =>
+        newTeeth[tn].conditions.some(c => c.startsWith(`${baseId}:`) && c.endsWith(':ANCHOR'))
+    );
+
+    if (anchors.length > 0) {
+        const indices = anchors.map(tn => ALL_TEETH.indexOf(tn));
+        const minIdx = Math.min(...indices);
+        const maxIdx = Math.max(...indices);
+        const range = ALL_TEETH.slice(minIdx, maxIdx + 1);
+
+        range.forEach(rn => {
+            const isAnchor = anchors.includes(rn);
+            if (!isAnchor && newTeeth[rn]) {
+                const rt = { ...newTeeth[rn] };
+                rt.conditions = [...rt.conditions.filter(c => !c.startsWith(`${lineId}:`)), `${lineId}:${colorState}`];
+                newTeeth[rn] = rt;
+            }
+        });
+
+        archTeeth.forEach(tn => {
+            if (!range.includes(tn)) {
+                const rt = { ...newTeeth[tn] };
+                rt.conditions = rt.conditions.filter(c => !c.startsWith(`${lineId}:`));
+                newTeeth[tn] = rt;
+            }
+        });
+    } else {
+        archTeeth.forEach(tn => {
+            const rt = { ...newTeeth[tn] };
+            rt.conditions = rt.conditions.filter(c => !c.startsWith(`${lineId}:`));
+            newTeeth[tn] = rt;
+        });
+    }
+};
+
 const useOdontogramStore = create((set, get) => ({
     teeth: buildState(),
     selected: null,
@@ -25,6 +71,8 @@ const useOdontogramStore = create((set, get) => ({
     dirty: false,
     pendingLogs: [],
     toothHistory: [],
+    globalSpecifications: '',
+    globalObservations: '',
 
     // Actions
     setIsTemporary: (isTemp) => set({ isTemporary: isTemp }),
@@ -32,6 +80,8 @@ const useOdontogramStore = create((set, get) => ({
     setActiveTool: (tool) => set({ activeTool: tool }),
     setSelected: (n) => set({ selected: n }),
     setActiveMode: (mode) => set({ activeMode: mode }),
+    setGlobalSpecifications: (val) => set({ globalSpecifications: val, dirty: true }),
+    setGlobalObservations: (val) => set({ globalObservations: val, dirty: true }),
 
     setEvolutionState: (n, state) => set((stateStore) => {
         const teeth = { ...stateStore.teeth };
@@ -86,14 +136,49 @@ const useOdontogramStore = create((set, get) => ({
                         };
                     }
                 });
-                set({ teeth: mergedTeeth, loading: false, dirty: false });
+                set({
+                    teeth: mergedTeeth,
+                    globalSpecifications: backendData.globalSpecifications || '',
+                    globalObservations: backendData.globalObservations || '',
+                    loading: false,
+                    dirty: false
+                });
             } else {
-                set({ teeth: buildState(), loading: false, dirty: false });
+                set({
+                    teeth: buildState(),
+                    globalSpecifications: '',
+                    globalObservations: '',
+                    loading: false,
+                    dirty: false
+                });
             }
         } catch (e) {
             console.error('Error fetching odontogram:', e);
             set({ teeth: buildState(), loading: false, dirty: false });
         }
+    },
+
+    markTeeth: (toothNumbers, findingId) => {
+        set((state) => {
+            const newTeeth = { ...state.teeth };
+            const newLogs = [...state.pendingLogs];
+            const [id, colorState] = findingId.split(':');
+
+            toothNumbers.forEach(n => {
+                if (newTeeth[n]) {
+                    const t = { ...newTeeth[n] };
+                    t.conditions = [...t.conditions.filter(c => !c.startsWith(`${id}:`)), `${id}:${colorState}:ANCHOR`];
+                    newTeeth[n] = t;
+                    newLogs.push({ toothNumber: n, conditionId: findingId, action: 'ADD', description: `Añadió condición ${findingId}` });
+                }
+            });
+
+            if (RANGE_FINDINGS.includes(id) && toothNumbers.length > 0) {
+                syncRangeArch(newTeeth, toothNumbers[0], colorState, id);
+            }
+
+            return { teeth: newTeeth, dirty: true, pendingLogs: newLogs };
+        });
     },
 
     markTooth: (n, findingId = null) => {
@@ -106,20 +191,80 @@ const useOdontogramStore = create((set, get) => ({
         }
 
         set((state) => {
-            const t = { ...state.teeth[n] };
+            const newTeeth = { ...state.teeth };
+            const t = { ...newTeeth[n] };
             const currentIdx = t.conditions.indexOf(toolToApply);
             const newLogs = [...state.pendingLogs];
 
+            // Analizar si es una condición bidireccional (Fusión o Transposición)
+            const [id, colorState, partner] = toolToApply.split(':');
+            const isBidirectional = (id === 'FUS' || id === 'TRA') && partner;
+            const isRange = RANGE_FINDINGS.includes(id);
+
             if (currentIdx > -1) {
+                // Remover
                 t.conditions = t.conditions.filter(id => id !== toolToApply);
                 newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'REMOVE', description: `Retiró condición ${toolToApply}` });
+
+                // Si es bidireccional, remover recíproco
+                if (isBidirectional) {
+                    const pNum = parseInt(partner);
+                    if (newTeeth[pNum]) {
+                        const pt = { ...newTeeth[pNum] };
+                        const reciprocal = `${id}:${colorState}:${n}`;
+                        pt.conditions = pt.conditions.filter(c => c !== reciprocal);
+                        newTeeth[pNum] = pt;
+                    }
+                }
+
+                if (isRange) {
+                    // Toggle explicit anchor
+                    const baseId = `${id}:${colorState}`;
+                    const hasAnyAnchor = t.conditions.some(c => c.startsWith(`${id}:`));
+
+                    if (hasAnyAnchor) {
+                        t.conditions = t.conditions.filter(c => !c.startsWith(`${id}:`) && !c.startsWith(`${id}_L:`));
+                    } else {
+                        t.conditions = [...t.conditions, `${baseId}:ANCHOR`];
+                    }
+                    newTeeth[n] = t;
+
+                    syncRangeArch(newTeeth, n, colorState, id);
+
+                    return { teeth: newTeeth, dirty: true, selected: n, pendingLogs: newLogs };
+                }
             } else {
+                // Añadir
                 t.conditions = [...t.conditions, toolToApply];
                 newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'ADD', description: `Añadió condición ${toolToApply}` });
+
+                // Si es bidireccional, añadir recíproco
+                if (isBidirectional) {
+                    const pNum = parseInt(partner);
+                    if (newTeeth[pNum]) {
+                        const pt = { ...newTeeth[pNum] };
+                        const reciprocal = `${id}:${colorState}:${n}`;
+                        if (!pt.conditions.includes(reciprocal)) {
+                            pt.conditions = [...pt.conditions, reciprocal];
+                        }
+                        newTeeth[pNum] = pt;
+                    }
+                }
+
+                if (isRange) {
+                    const baseId = `${id}:${colorState}`;
+                    t.conditions = [...t.conditions.filter(c => !c.startsWith(`${id}:`)), `${baseId}:ANCHOR`];
+                    newTeeth[n] = t;
+
+                    syncRangeArch(newTeeth, n, colorState, id);
+
+                    return { teeth: newTeeth, dirty: true, selected: n, pendingLogs: newLogs };
+                }
             }
 
+            newTeeth[n] = t;
             return {
-                teeth: { ...state.teeth, [n]: t },
+                teeth: newTeeth,
                 dirty: true,
                 selected: n,
                 pendingLogs: newLogs
@@ -172,12 +317,14 @@ const useOdontogramStore = create((set, get) => ({
     }),
 
     saveOdontogram: async (patientId) => {
-        const { teeth, pendingLogs } = get();
+        const { teeth, pendingLogs, globalSpecifications, globalObservations } = get();
         set({ saving: true });
         try {
             await api.put(`odontograms/${patientId}`, {
                 data: teeth,
-                logs: pendingLogs
+                logs: pendingLogs,
+                globalSpecifications,
+                globalObservations
             });
             set({ saving: false, dirty: false, pendingLogs: [] });
         } catch (e) {
