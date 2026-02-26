@@ -1,3 +1,7 @@
+const express = require('express');
+const router = express.Router();
+const consentController = require('../controllers/consentController');
+const authMiddleware = require('../middlewares/authMiddleware');
 const { upload } = require('../config/cloudinary');
 
 router.get('/templates', authMiddleware, consentController.getTemplates);
