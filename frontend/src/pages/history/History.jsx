@@ -10,6 +10,7 @@ import TreatmentPlans from '../../components/TreatmentPlans';
 import Odontograma from '../../components/Odontograma';
 import AttendModal from '../../components/AttendModal';
 import InitialTreatmentView from '../../components/InitialTreatmentView';
+import { ErrorBoundary } from 'react-error-boundary';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -639,11 +640,13 @@ const History = () => {
 
                             {/* Scrollable body */}
                             <div style={{ flex: 1, overflowY: 'auto', padding: '32px 36px' }}>
-                                <Odontograma
-                                    patientId={selected.id}
-                                    patientName={`${selected.firstName} ${selected.paternalSurname}`}
-                                    patient={selected}
-                                />
+                                <ErrorBoundary fallbackRender={({ error }) => <div className="p-10 text-red-600 bg-red-50 border border-red-200 m-10 whitespace-pre-wrap"><h1 className="text-2xl font-bold mb-4">Component Crash</h1>{error.message}{"\n\n"}{error.stack}</div>}>
+                                    <Odontograma
+                                        patientId={selected.id}
+                                        patientName={`${selected.firstName} ${selected.paternalSurname}`}
+                                        patient={selected}
+                                    />
+                                </ErrorBoundary>
                             </div>
                         </motion.div>
                     </>

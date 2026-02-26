@@ -153,7 +153,7 @@ const getStatusLetter = (data) => {
             const isCaries = finding.group === 'CARIES';
             const isDDE = finding.group === 'DDE';
 
-            if (finding.type === 'box' || finding.type === 'text_grado' || isCaries || isDDE || ['TC', 'PC', 'PP', 'CT', 'CM', 'CMC', 'CV', 'CJ', 'CF', 'IMP', 'OFJ', 'TRA'].includes(id)) {
+            if (finding.type === 'box' || finding.type === 'text_grado' || isCaries || isDDE || ['TC', 'PC', 'PP', 'CT', 'CM', 'CMC', 'CV', 'CJ', 'CF', 'IMP', 'OFJ', 'TRA', 'SEAL'].includes(id)) {
                 return {
                     sigla: label,
                     color: (isCaries || isDDE || state === 'BAD') ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE
@@ -822,90 +822,99 @@ const EvolutionPopover = ({ anchor, onClose, onSelect, currentState }) => {
     );
 };
 
-const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIAL' }) => {
-    const isUpperTooth = isUpper(number);
-    const isMolarTooth = isMolar(number);
-
-    // COP Proportions: Crown approx 0.5cm2 visual. 
-    // We increase W slightly to give more presence.
-    const W = 62;
-    const H = 100;
-    const padding = 2;
-
-    const cH = 45; // Crown height
-    const cW = W - (padding * 2);
-
-    // Orientation: Upper teeth have roots ABOVE crown. Lower teeth have roots BELOW crown.
-    const cY = isUpperTooth ? H - cH - 5 : 5;
-
-    const mx = W / 2;
-    const my = cY + (cH / 2);
-    const offset = 10;
-
-    // COP Crown Shape (Sharp Trapezoid)
-    const crownTopWidth = isUpperTooth ? cW : cW * 0.7;
-    const crownBottomWidth = isUpperTooth ? cW * 0.7 : cW;
-    const ctL = mx - (crownTopWidth / 2);
-    const ctR = mx + (crownTopWidth / 2);
-    const cbL = mx - (crownBottomWidth / 2);
-    const cbR = mx + (crownBottomWidth / 2);
-
-    const crownPoints = `${ctL},${cY} ${ctR},${cY} ${cbR},${cY + cH} ${cbL},${cY + cH}`;
-
-    // COP Surface Cross Map (5 sectors)
-    const surf = {
-        V: isUpperTooth
-            ? `${ctL},${cY} ${ctR},${cY} ${mx},${my}`
-            : `${cbL},${cY + cH} ${cbR},${cY + cH} ${mx},${my}`,
-        L: isUpperTooth
-            ? `${cbL},${cY + cH} ${cbR},${cY + cH} ${mx},${my}`
-            : `${ctL},${cY} ${ctR},${cY} ${mx},${my}`,
-        M: `${ctL},${cY} ${cbL},${cY + cH} ${mx},${my}`,
-        D: `${ctR},${cY} ${cbR},${cY + cH} ${mx},${my}`,
-        O: `${mx - offset},${my - offset} ${mx + offset},${my - offset} ${mx + offset},${my + offset} ${mx - offset},${my + offset}`,
+// Helper to map CM_HISTORIA_CLINICA geometries
+const getToothShapes = (number, isUpperTooth) => {
+    // Top, Left, Bottom, Right, Center
+    // Base dimensions from old project: 30x30 for crown
+    const crowns = {
+        top: isUpperTooth ? "0,30 30,30 20,20 10,20" : "0,0 30,0 20,10 10,10",
+        left: "0,0 10,10 10,20 0,30",
+        bottom: isUpperTooth ? "0,0 10,10 20,10 30,0" : "0,30 10,20 20,20 30,30",
+        right: "30,0 20,10 20,20 30,30",
+        center: isUpperTooth
+            ? "10,10 20,10 20,20 10,20 10,20 13.33,20 13.33,10 16.33,10 16.33,20 20,20 20,15 10,15 10,20 20,20 20,10 10,10"
+            : "10,10 20,10 20,20 10,20 10,10 13.33,10 13.33,20 16.33,20 16.33,10 20,10 20,15 10,15 10,10 20,10 20,20 10,20"
     };
 
-    // COP Anatomy: Molar multiple roots (sharp), Anterior single.
     let roots = [];
-    if (isUpperTooth) {
-        const rootBaseY = cY;
-        const rootTopY = 2; // Sharp tip at top
-        if (isMolarTooth) {
-            roots = [
-                `${ctL},${rootBaseY} ${ctL - 4},${rootTopY} ${ctL + cW / 4},${rootBaseY}`,
-                `${mx},${rootBaseY} ${mx},${rootTopY - 2} ${mx + 5},${rootBaseY}`,
-                `${ctR - cW / 4},${rootBaseY} ${ctR + 4},${rootTopY} ${ctR},${rootBaseY}`
-            ];
-        } else if ([14, 24].includes(number)) { // 1st Premolars usually 2 roots
-            roots = [
-                `${ctL + 4},${rootBaseY} ${mx - 6},${rootTopY} ${mx},${rootBaseY}`,
-                `${mx},${rootBaseY} ${mx + 6},${rootTopY} ${ctR - 4},${rootBaseY}`
-            ];
-        } else {
-            roots = [`${ctL + 8},${rootBaseY} ${mx},${rootTopY} ${ctR - 8},${rootBaseY}`];
-        }
+    const isMolarTooth = isMolar(number);
+    if (isMolarTooth) {
+        roots = [
+            "0,30 5,50 10,30",
+            "10,30 15,50 20,30",
+            "20,30 25,50 30,30"
+        ];
+    } else if ([14, 24].includes(number)) {
+        roots = [
+            "5,30 10,50 15,30",
+            "15,30 20,50 25,30"
+        ];
+    } else if ([15, 25, 34, 35, 44, 45].includes(number)) {
+        roots = [
+            "10,30 15,50 20,30"
+        ];
     } else {
-        const rootBaseY = cY + cH;
-        const rootBottomY = H - 2;
-        if (isMolarTooth) {
-            roots = [
-                `${cbL},${rootBaseY} ${cbL - 4},${rootBottomY} ${mx},${rootBaseY}`,
-                `${mx},${rootBaseY} ${cbR + 4},${rootBottomY} ${cbR},${rootBaseY}`
-            ];
-        } else {
-            roots = [`${cbL + 8},${rootBaseY} ${mx},${rootBottomY} ${cbR - 8},${rootBaseY}`];
-        }
+        // Incisors / Canines
+        roots = [
+            "10,30 15,50 20,30"
+        ];
+        // Incisors have slightly different crown centers in the old code,
+        // but it's simpler to use the same logic or adapt it. 
+        // We'll use the exact coordinates from the old index.tsx for incisors.
+        crowns.top = isUpperTooth ? "0,30 30,30 20,15 10,15" : "0,0 30,0 20,15 10,15";
+        crowns.left = "0,0 10,15 0,30";
+        crowns.bottom = isUpperTooth ? "0,0 10,15 20,15 30,0" : "0,30 10,15 20,15 30,30";
+        crowns.right = "30,0 20,15 30,30";
+        crowns.center = ""; // No center for incisors in old project
     }
 
-    const allConditions = (data?.conditions || []).map(c => getConditionData(c)).filter(Boolean);
-    const hasFusion = allConditions.some(c => c.id === 'FUS');
-    const hasGem = allConditions.some(c => c.id === 'GEM');
-    const borderColor = isSelected ? PROTOCOL_COLORS.BLUE : '#94a3b8';
+    return { crowns, roots };
+};
+
+const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIAL' }) => {
+    const isUpperTooth = isUpper(number);
+
+    // Scale up slightly to match the UI better (40x65 -> padded)
+    const W = 40; // Display width
+    const H = 65; // Display height
+
+    // Surface mapping to old names
+    // V = Vestibular (Top/Bottom depending on upper/lower)
+    // L = Lingual/Palatino (Bottom/Top depending on upper/lower)
+    // M = Mesial
+    // D = Distal
+    // O = Oclusal (Center)
+
+    // Note: the old code used transform="scale(1,-1)" for upper teeth.
+    // Instead of transforming the whole group which messes with interactions,
+    // we just use the raw coordinates from old code.
+    const { crowns, roots } = getToothShapes(number, isUpperTooth);
+
+    const surfMap = {
+        V: isUpperTooth ? crowns.bottom : crowns.top,
+        L: isUpperTooth ? crowns.top : crowns.bottom,
+        M: crowns.left, // Default, will be adjusted
+        D: crowns.right, // Default, will be adjusted
+        O: crowns.center
+    };
+
+    // We only need M/D relative to midline.
+    // Right quadrant (1x, 4x, 5x, 8x): M is Right, D is Left.
+    // Left quadrant (2x, 3x, 6x, 7x): M is Left, D is Right.
+    const isRightQuadrant = [1, 4, 5, 8].includes(Math.floor(number / 10));
+    surfMap.M = isRightQuadrant ? crowns.right : crowns.left;
+    surfMap.D = isRightQuadrant ? crowns.left : crowns.right;
 
     // Box sigles
     const boxSigles = getStatusLetter(data);
     const topSigles = isUpperTooth ? boxSigles : [];
     const bottomSigles = !isUpperTooth ? boxSigles : [];
+
+    // Removed variables re-added
+    const allConditions = (data?.conditions || []).map(c => getConditionData(c)).filter(Boolean);
+    const hasFusion = allConditions.some(c => c.id === 'FUS');
+    const hasGem = allConditions.some(c => c.id === 'GEM');
+    const borderColor = isSelected ? PROTOCOL_COLORS.BLUE : '#475569'; // darker slate-600 for contrast
 
     return (
         <div
@@ -934,97 +943,92 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
 
             {/* 2. Gráfico Dental (SVG) */}
             <svg
-                width={W} height={H}
-                viewBox={`0 0 ${W} ${H}`}
+                width="40" height="65"
+                viewBox="0 0 30 50"
                 className={cn("block overflow-visible pointer-events-none relative z-10")}
+                transform={isUpperTooth ? "scale(1,-1)" : "scale(1,1)"}
             >
                 {/* Roots */}
                 {roots.map((r, i) => (
-                    <polygon key={i} points={r} fill="none" stroke={borderColor} strokeWidth="1.2" />
+                    <polygon key={`r${i}`} points={r} fill="none" stroke={borderColor} strokeWidth="1" />
                 ))}
-
-                {/* Crown Border */}
-                <polygon
-                    points={crownPoints}
-                    fill="white"
-                    stroke={borderColor} strokeWidth="1.2"
-                />
 
                 {/* Drawings Overlay */}
                 <g>
                     {['V', 'L', 'M', 'D', 'O'].map(s => {
+                        if (!surfMap[s]) return null;
                         const fill = sc(data, s);
                         return (
-                            <polygon key={s} points={surf[s]}
-                                fill={fill || "transparent"}
+                            <polygon key={s} points={surfMap[s]}
+                                fill={fill || "white"}
                                 onClick={e => { e.stopPropagation(); onSurface(number, s, e); }}
-                                className="hover:fill-blue-50/50 transition-colors"
-                                stroke="#e2e8f0" strokeWidth="0.5"
+                                className="hover:fill-blue-50/50 transition-colors pointer-events-auto"
+                                stroke={borderColor} strokeWidth="1"
                             />
                         );
                     })}
-
-                    {/* Fissures for Molars */}
-                    {isMolarTooth && (
-                        <path d={`M${mx - 6},${my - 6} L${mx + 6},${my + 6} M${mx + 6},${my - 6} L${mx - 6},${my + 6}`}
-                            stroke="#e2e8f0" strokeWidth="0.5" className="pointer-events-none" />
-                    )}
 
                     {/* Condition Drawings */}
                     {allConditions.map((cond, idx) => {
                         if (cond.type !== 'drawing') return null;
                         const color = cond.color;
+                        const mx = 15;
+                        const my = 15;
+                        const mW = 30;
+                        const mH = 50;
+                        const cY = 0;
+                        const cH = 30;
 
                         switch (cond.visual) {
                             case 'circle_full':
-                                return <polygon key={idx} points={crownPoints} fill="none" stroke={color} strokeWidth="3" />;
+                                return <circle key={idx} cx={mx} cy={my} r={15} fill="none" stroke={color} strokeWidth="2" />;
                             case 'rect_full': // Corona Temporal Square
-                                return <rect key={idx} x={mx - cW / 2} y={cY} width={cW} height={cH} fill="none" stroke={color} strokeWidth="3" />;
+                                return <rect key={idx} x={0} y={cY} width={30} height={30} fill="none" stroke={color} strokeWidth="2" />;
                             case 'bridge_line':
-                                return <line key={idx} x1={-5} y1={my} x2={W + 5} y2={my} stroke={color} strokeWidth="4" />;
+                                return <line key={idx} x1={-5} y1={my} x2={35} y2={my} stroke={color} strokeWidth="2" />;
                             case 'cross_big':
                                 return (
-                                    <g key={idx} stroke={color} strokeWidth={3} strokeLinecap="round">
-                                        <line x1={5} y1={cY + 5} x2={W - 5} y2={cY + cH - 5} />
-                                        <line x1={W - 5} y1={cY + 5} x2={5} y2={cY + cH - 5} />
+                                    <g key={idx} stroke={color} strokeWidth={2} strokeLinecap="round">
+                                        <line x1={0} y1={0} x2={30} y2={30} />
+                                        <line x1={30} y1={0} x2={0} y2={30} />
                                     </g>
                                 );
                             case 'screw':
-                                return <rect key={idx} x={mx - 4} y={isUpperTooth ? 5 : H - 35} width={8} height={10} fill={color} rx="1" />;
+                                return <rect key={idx} x={12} y={isUpperTooth ? 35 : 35} width={6} height={10} fill={color} rx="1" />;
                             case 'root_line':
                                 return (
                                     <g key={idx}>
                                         {roots.map((r, i) => {
                                             const tip = r.split(' ')[1].split(',');
-                                            return <line key={i} x1={mx} y1={my} x2={tip[0]} y2={tip[1]} stroke={color} strokeWidth="3.5" strokeLinecap="round" />;
+                                            return <line key={i} x1={mx} y1={30} x2={tip[0]} y2={tip[1]} stroke={color} strokeWidth="2" strokeLinecap="round" />;
                                         })}
                                     </g>
                                 );
                             case 'coronal_pulp':
                                 return (
-                                    <rect key={idx} x={mx - 10} y={my - 10} width={20} height={20} fill={color} />
+                                    <rect key={idx} x={mx - 6} y={my - 6} width={12} height={12} fill={color} />
                                 );
                             case 'arrow_extrude': {
-                                // Pointing occlusal (AWAY from roots): Down for upper, Up for lower
-                                const arrowY = isUpperTooth ? cY + cH + 5 : cY - 5;
-                                const dir = isUpperTooth ? 15 : -15;
+                                // Pointing occlusal (AWAY from roots): Down
+                                const arrowY = -5;
+                                const dir = -12;
                                 return (
                                     <path
                                         key={idx}
-                                        d={`M${mx},${arrowY} v${dir} l-5,${isUpperTooth ? -5 : 5} m5,${isUpperTooth ? 5 : -5} l5,${isUpperTooth ? -5 : 5}`}
-                                        fill="none" stroke={color} strokeWidth="3"
+                                        d={`M${mx},${arrowY} v${dir} l-4,4 m4,-4 l4,4`}
+                                        fill="none" stroke={color} strokeWidth="2"
                                     />
                                 );
                             }
                             case 'arrow_intrude': {
-                                // Pointing apical (TOWARDS roots): Up for upper, Down for lower
-                                const arrowY = isUpperTooth ? cY + cH + 5 : cY - 5;
-                                const dir = isUpperTooth ? -15 : 15;
+                                // Pointing apical (TOWARDS roots): Up
+                                const arrowY = -5;
+                                const dir = 12;
                                 return (
                                     <path
                                         key={idx}
-                                        d={`M${mx},${arrowY} v${dir} l-5,${isUpperTooth ? 5 : -5} m5,${isUpperTooth ? -5 : 5} l5,${isUpperTooth ? 5 : -5}`}
-                                        fill="none" stroke={color} strokeWidth="3"
+                                        d={`M${mx},${arrowY} v${dir} l-4,-4 m4,4 l4,-4`}
+                                        fill="none" stroke={color} strokeWidth="2"
                                     />
                                 );
                             }
@@ -1037,39 +1041,46 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                                 if (partnerID) pIdx = ALL_TEETH.indexOf(parseInt(partnerID));
 
                                 if (pIdx === -1) return null;
-                                const dist = (pIdx - nIdx) * (W + 4);
+                                const dist = (pIdx - nIdx) * 40; // Approx distance
                                 const cx = mx + dist / 2;
-                                const cy = isUpperTooth ? 0 : H;
+                                const cy = 50;
 
                                 return (
                                     <g key={idx}>
-                                        <circle cx={cx} cy={cy} r={10} fill="white" stroke={color} strokeWidth="2" />
-                                        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="black" fill={color}>S</text>
+                                        <circle cx={cx} cy={cy} r={8} fill="white" stroke={color} strokeWidth="2" />
+                                        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="black" fill={color}>S</text>
                                     </g>
                                 );
                             }
                             case 'edentulous_range': {
-                                // Line crossing crowns (NTS N°150 5.3.10)
-                                const etY = isUpperTooth ? my + 25 : my - 25;
+                                // Line crossing crowns
+                                const etY = 15;
                                 return (
                                     <line
                                         key={idx}
-                                        x1={-3} y1={etY} x2={W + 3} y2={etY}
-                                        stroke={color} strokeWidth="4"
+                                        x1={-3} y1={etY} x2={33} y2={etY}
+                                        stroke={color} strokeWidth="3"
                                     />
                                 );
                             }
                             case 'zigzag_arrow':
-                                return <path key={idx} d={`M${mx - 5},${cY - 20} l5,5 l-5,5 l5,5 v5`} fill="none" stroke={color} strokeWidth="2" />;
+                                return <path key={idx} d={`M10,-10 l5,5 l-5,5 l5,5 v5`} fill="none" stroke={color} strokeWidth="2" />;
                             case 'surface_mark': // Sellante (S)
-                                return <circle key={idx} cx={mx} cy={my} r={4} fill="none" stroke={color} strokeWidth="1.5" />;
+                                return (
+                                    <path
+                                        key={idx}
+                                        d={`M${mx - 3.5},${my} h7 M${mx},${my - 3.5} v7`}
+                                        fill="none"
+                                        stroke={color}
+                                        strokeWidth="4"
+                                        strokeLinecap="round"
+                                    />
+                                );
                             case 'dotted_line': // PR
-                                return <line key={idx} x1={0} y1={my} x2={W} y2={my} stroke={color} strokeWidth="2" strokeDasharray="4 2" />;
+                                return <line key={idx} x1={0} y1={my} x2={30} y2={my} stroke={color} strokeWidth="2" strokeDasharray="4 2" />;
                             case 'curve_arrow': // Giroversión
-                                return <path key={idx} d={`M${mx - 10},${cY - 5} Q${mx},${cY - 15} ${mx + 10},${cY - 5} m-3,0 l3,3 l3,-3`} fill="none" stroke={color} strokeWidth="2" />;
+                                return <path key={idx} d={`M5,-5 Q15,-15 25,-5 m-3,0 l3,3 l3,-3`} fill="none" stroke={color} strokeWidth="2" />;
                             case 'cross_arrows': { // Transposición
-                                // Crossing curved arrows at the level of the tooth numbers
-                                // Format: TRA:STATUS:PARTNER
                                 const parts = cond.id.split(':');
                                 const partnerID = parts[2];
                                 let pIdx = -1;
@@ -1079,70 +1090,63 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                                     pIdx = ALL_TEETH.indexOf(parseInt(partnerID));
                                 }
 
-                                const ty = isUpperTooth ? H + 12 : -12;
-                                const dist = pIdx !== -1 ? (pIdx - nIdx) * (W + 4) : 0;
-
-                                // To match official diagram:
-                                // Tooth on the "left" (lower index) draws the TOP arrow pointing right.
-                                // Tooth on the "right" (higher index) draws the BOTTOM arrow pointing left.
+                                const ty = -10;
+                                const dist = pIdx !== -1 ? (pIdx - nIdx) * 32 : 0;
                                 const isLeftTooth = pIdx > nIdx;
 
-                                if (pIdx === -1) return null; // No partner, no arrow
+                                if (pIdx === -1) return null;
 
                                 return (
-                                    <g key={idx} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <g key={idx} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         {isLeftTooth ? (
-                                            /* Top Arrow (for upper) / Bottom (for lower) */
-                                            <path d={`M ${mx} ${ty} Q ${mx + dist / 2} ${isUpperTooth ? ty + 12 : ty - 12} ${mx + dist} ${ty} l -5 ${isUpperTooth ? -5 : 5} m 5 ${isUpperTooth ? 5 : -5} l -5 ${isUpperTooth ? 5 : -5}`} />
+                                            <path d={`M ${mx} ${ty} Q ${mx + dist / 2} ${ty + 10} ${mx + dist} ${ty} l -4 ${-4} m 4 ${4} l -4 ${4}`} />
                                         ) : (
-                                            <path d={`M ${mx} ${ty} Q ${mx + dist / 2} ${isUpperTooth ? ty - 12 : ty + 12} ${mx + dist} ${ty} l 5 ${isUpperTooth ? -5 : 5} m -5 ${isUpperTooth ? 5 : -5} l 5 ${isUpperTooth ? 5 : -5}`} />
+                                            <path d={`M ${mx} ${ty} Q ${mx + dist / 2} ${ty - 10} ${mx + dist} ${ty} l 4 ${-4} m -4 ${4} l 4 ${4}`} />
                                         )}
                                     </g>
                                 );
                             }
                             case 'slash_line': // Fractura
-                                return <path key={idx} d={`M${mx - 15},${my - 5} l10,10 l10,-10 l5,10`} fill="none" stroke={color} strokeWidth="2" />;
+                                return <path key={idx} d={`M30,0 L0,50`} fill="none" stroke={color} strokeWidth="3" />;
                             case 'diastema_parenthesis':
                                 return (
                                     <g key={idx} stroke={color} strokeWidth={2}>
-                                        <path d={`M0,${my - 10} Q-5,${my} 0,${my + 10}`} />
-                                        <path d={`M${W},${my - 10} Q${W + 5},${my} ${W},${my + 10}`} />
+                                        <path d={`M0,5 Q-5,15 0,25`} />
+                                        <path d={`M30,5 Q35,15 30,25`} />
                                     </g>
                                 );
-                            case 'number_fusion': // Fusión logic is in the number div below
+                            case 'number_fusion':
                                 return null;
-                            case 'circle_over_number': // Geminación logic is in the number div below
+                            case 'circle_over_number':
                                 return null;
                             case 'ortho_range':
                             case 'bridge_range': {
                                 const isAnchor = cond.id.endsWith(':ANCHOR');
-                                const apexY = isUpperTooth ? 2 : H - 2;
+                                const apexY = 48;
                                 const isOrtho = cond.id.startsWith('OFJ');
-                                const squareSize = 10;
+                                const squareSize = 8;
 
                                 return (
                                     <g key={idx}>
                                         <line
-                                            x1={-3} y1={apexY} x2={W + 3} y2={apexY}
-                                            stroke={color} strokeWidth="4"
+                                            x1={-3} y1={apexY} x2={33} y2={apexY}
+                                            stroke={color} strokeWidth="2"
                                         />
-                                        {/* PF (Bridge) and OFJ (Ortho) both use vertical tags on anchors */}
                                         {isAnchor && (
                                             <line
                                                 x1={mx} y1={apexY - 6} x2={mx} y2={apexY + 6}
-                                                stroke={color} strokeWidth="4"
+                                                stroke={color} strokeWidth="2"
                                             />
                                         )}
-                                        {/* Only OFJ uses the square marker */}
                                         {isAnchor && isOrtho && (
                                             <g>
                                                 <rect
                                                     x={mx - squareSize / 2} y={apexY - squareSize / 2}
                                                     width={squareSize} height={squareSize}
-                                                    fill="white" stroke={color} strokeWidth="2.5"
+                                                    fill="white" stroke={color} strokeWidth="2"
                                                 />
-                                                <line x1={mx - 3} y1={apexY} x2={mx + 3} y2={apexY} stroke={color} strokeWidth="2" />
-                                                <line x1={mx} y1={apexY - 3} x2={mx} y2={apexY + 3} stroke={color} strokeWidth="2" />
+                                                <line x1={mx - 3} y1={apexY} x2={mx + 3} y2={apexY} stroke={color} strokeWidth="1.5" />
+                                                <line x1={mx} y1={apexY - 3} x2={mx} y2={apexY + 3} stroke={color} strokeWidth="1.5" />
                                             </g>
                                         )}
                                     </g>
@@ -1150,13 +1154,13 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                             }
 
                             case 'ortho_zigzag': {
-                                const apexY = isUpperTooth ? 2 : H - 2;
-                                const segments = 8;
-                                const dx = (W + 6) / segments;
-                                let path = `M -3 ${apexY}`;
+                                const apexY = 48;
+                                const segments = 4;
+                                const dx = 32 / segments;
+                                let path = `M -1 ${apexY}`;
                                 for (let i = 1; i <= segments; i++) {
-                                    const x = -3 + i * dx;
-                                    const y = apexY + (i % 2 === 0 ? -4 : 4);
+                                    const x = -1 + i * dx;
+                                    const y = apexY + (i % 2 === 0 ? -3 : 3);
                                     path += ` L ${x} ${y}`;
                                 }
                                 return (
@@ -1165,7 +1169,7 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                                         d={path}
                                         fill="none"
                                         stroke={color}
-                                        strokeWidth="4"
+                                        strokeWidth="2"
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                     />
@@ -1173,37 +1177,35 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                             }
 
                             case 'dotted_range': {
-                                const apexY = isUpperTooth ? 2 : H - 2;
+                                const apexY = 48;
                                 return (
                                     <line
                                         key={idx}
-                                        x1={-3} y1={apexY} x2={W + 3} y2={apexY}
-                                        stroke={color} strokeWidth="4"
-                                        strokeDasharray="6,4"
+                                        x1={-2} y1={apexY} x2={32} y2={apexY}
+                                        stroke={color} strokeWidth="2"
+                                        strokeDasharray="4,2"
                                     />
                                 );
                             }
 
                             case 'parallel_lines_apex': {
-                                // Two parallel horizontal lines at the level of the apices
-                                const paY = isUpperTooth ? 2 : H - 2;
+                                const paY = 45;
                                 const offset = 4;
                                 return (
                                     <g key={idx}>
-                                        <line x1={-3} y1={paY - offset / 2} x2={W + 3} y2={paY - offset / 2} stroke={color} strokeWidth="3" />
-                                        <line x1={-3} y1={paY + offset / 2} x2={W + 3} y2={paY + offset / 2} stroke={color} strokeWidth="3" />
+                                        <line x1={-2} y1={paY - offset / 2} x2={32} y2={paY - offset / 2} stroke={color} strokeWidth="2" />
+                                        <line x1={-2} y1={paY + offset / 2} x2={32} y2={paY + offset / 2} stroke={color} strokeWidth="2" />
                                     </g>
                                 );
                             }
 
                             case 'parallel_lines_crown': {
-                                // Two parallel horizontal lines over the crowns
-                                const pcY = isUpperTooth ? -15 : H + 15;
+                                const pcY = -5;
                                 const offset = 4;
                                 return (
                                     <g key={idx}>
-                                        <line x1={-3} y1={pcY - offset / 2} x2={W + 3} y2={pcY - offset / 2} stroke={color} strokeWidth="3" />
-                                        <line x1={-3} y1={pcY + offset / 2} x2={W + 3} y2={pcY + offset / 2} stroke={color} strokeWidth="3" />
+                                        <line x1={-2} y1={pcY - offset / 2} x2={32} y2={pcY - offset / 2} stroke={color} strokeWidth="2" />
+                                        <line x1={-2} y1={pcY + offset / 2} x2={32} y2={pcY + offset / 2} stroke={color} strokeWidth="2" />
                                     </g>
                                 );
                             }
@@ -1402,7 +1404,7 @@ const Odontograma = ({ patientId }) => {
 
 
     const renderRow = (nums, upper) => (
-        <div className="flex gap-[1px]">
+        <div className="flex gap-0">
             {nums.map(n => (
                 <ToothSVG key={n} number={n} data={teeth[n]}
                     mode={activeMode}
