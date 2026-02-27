@@ -102,7 +102,7 @@ const MINSA_FINDINGS = [
     { id: 'EXTRUDED', label: 'Pieza Extruida', sigla: '↓', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'arrow_extrude' },
     { id: 'INTRUDED', label: 'Pieza Intruida', sigla: '↑', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'arrow_intrude' },
     { id: 'SUPERNUMERARY', label: 'Pieza Supernumeraria', sigla: 'S', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'supernumerary_partner' },
-    { id: 'ECTOPIC', label: 'Pieza Ectópica', sigla: 'E', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
+    { id: 'ECT', label: 'Pieza Ectópica', sigla: 'E', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
     { id: 'IMPACTED', label: 'Impactación', sigla: 'I', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
     { id: 'MAC', label: 'Macrodoncia', sigla: 'MAC', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
     { id: 'MIC', label: 'Microdoncia', sigla: 'MIC', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
@@ -110,12 +110,12 @@ const MINSA_FINDINGS = [
     { id: 'GEM', label: 'Geminación', sigla: 'GEM', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'circle_over_number' },
     { id: 'GIR', label: 'Giroversión', sigla: 'GIR', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'curve_arrow' },
     { id: 'TRA', label: 'Transposición', sigla: 'TRA', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'cross_arrows' },
-    { id: 'CLAV', label: 'Pieza en Clavija', sigla: 'Δ', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'triangle_over_number' },
+    { id: 'CLAV', label: 'Pieza en Clavija', sigla: 'Δ', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'box' },
     { id: 'DIAST', label: 'Diastema', sigla: ')(', group: 'POSITION', color: PROTOCOL_COLORS.BLUE, type: 'drawing', visual: 'diastema_parenthesis' },
 
     // GRUPO: Otros hallazgos (ROJO)
     { id: 'FX', label: 'Fractura', sigla: 'FX', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'slash_line' },
-    { id: 'DES', label: 'Superficie Desgastada', sigla: 'DES', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'text' },
+    { id: 'DES', label: 'Superficie Desgastada', sigla: 'DES', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'box' },
     { id: 'RR', label: 'Remanente Radicular', sigla: 'RR', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'box' },
     { id: 'MOB', label: 'Movilidad Patológica', sigla: 'M', group: 'OTHERS', color: PROTOCOL_COLORS.RED, type: 'text_grado' },
 
@@ -153,7 +153,9 @@ const getStatusLetter = (data) => {
             const isCaries = finding.group === 'CARIES';
             const isDDE = finding.group === 'DDE';
 
-            if (finding.type === 'box' || finding.type === 'text_grado' || isCaries || isDDE || ['TC', 'PC', 'PP', 'CT', 'CM', 'CMC', 'CV', 'CJ', 'CF', 'IMP', 'OFJ', 'TRA', 'SEAL'].includes(id)) {
+            if (id === 'CLAV' || id === 'GEM') return null; // Exclude from sigla box as they have dedicated graphics
+
+            if (finding.type === 'box' || finding.type === 'text_grado' || isCaries || isDDE || ['TC', 'PC', 'PP', 'CT', 'CM', 'CMC', 'CV', 'CJ', 'CF', 'IMP', 'OFJ', 'TRA', 'ECT', 'SEAL', 'MAC', 'MIC', 'IMPACTED', 'DES'].includes(id)) {
                 return {
                     sigla: label,
                     color: (isCaries || isDDE || state === 'BAD') ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE
@@ -178,7 +180,7 @@ const getConditionData = (condStr) => {
         color = state === 'BAD' ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE;
     }
 
-    return { ...finding, id: condStr, color, state, extra };
+    return { ...finding, id: condStr, baseId: lookupId, color, state, extra };
 };
 
 const FindingIcon = ({ type, color = '#3b82f6' }) => {
@@ -398,6 +400,7 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
     if (!tooth) return null;
 
     const { fetchToothHistory, toothHistory } = useOdontogramStore();
+    const { budgets, fetchBudgets, updateBudgetItem } = useBudgetStore();
     const [search, setSearch] = React.useState('');
     const [selectedFinding, setSelectedFinding] = React.useState(null);
     const [findingState, setFindingState] = React.useState('BAD');
@@ -405,7 +408,24 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
 
     React.useEffect(() => {
         fetchToothHistory(patientId, number);
-    }, [number]);
+        fetchBudgets(patientId);
+    }, [number, patientId]);
+
+    const approvedItems = React.useMemo(() => {
+        return budgets
+            .filter(b => b.status === 'APPROVED' || b.status === 'PENDING') // Allow pending for direct execution if doc wants
+            .flatMap(b => (b.items || []).map(i => ({ ...i, budgetId: b.id })))
+            .filter(i => i.toothNumber === number.toString());
+    }, [budgets, number]);
+
+    const handleCompleteItem = async (item) => {
+        const ok = await updateBudgetItem(item.id, { status: 'COMPLETED' });
+        if (ok) {
+            // Also update odontogram state to CURADO
+            useOdontogramStore.getState().setEvolutionState(number, 'CURADO');
+            fetchBudgets(patientId);
+        }
+    };
 
     const filteredFindings = MINSA_FINDINGS.filter(f =>
         f.label.toLowerCase().includes(search.toLowerCase()) ||
@@ -736,6 +756,40 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
                             </div>
                         </div>
 
+                        {activeMode === 'EVOLUTION' && approvedItems.length > 0 && (
+                            <div className="pt-4 border-t border-slate-100">
+                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <CheckCircle size={14} className="text-emerald-500" /> Presupuesto Aprobado
+                                </h3>
+                                <div className="space-y-3">
+                                    {approvedItems.map(item => (
+                                        <div key={item.id} className={cn(
+                                            "p-4 rounded-[24px] border transition-all flex items-center justify-between",
+                                            item.status === 'COMPLETED' ? "bg-emerald-50 border-emerald-100 op-60" : "bg-white border-slate-100 shadow-sm"
+                                        )}>
+                                            <div>
+                                                <p className="text-[10px] font-black text-slate-800 uppercase">{item.service?.name}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tight">S/ {parseFloat(item.price).toFixed(2)}</p>
+                                            </div>
+                                            {item.status !== 'COMPLETED' ? (
+                                                <button
+                                                    onClick={() => handleCompleteItem(item)}
+                                                    className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all active:scale-95"
+                                                >
+                                                    Finalizar
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center gap-1.5 text-emerald-600">
+                                                    <Check size={14} />
+                                                    <span className="text-[9px] font-black uppercase">Terminado</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                                 <History size={14} className="text-indigo-400" /> Historial Clínico
@@ -912,8 +966,9 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
 
     // Removed variables re-added
     const allConditions = (data?.conditions || []).map(c => getConditionData(c)).filter(Boolean);
-    const hasFusion = allConditions.some(c => c.id === 'FUS');
-    const hasGem = allConditions.some(c => c.id === 'GEM');
+    const hasFusion = allConditions.some(c => c.baseId === 'FUS');
+    const hasGem = allConditions.some(c => c.baseId === 'GEM');
+    const hasClav = allConditions.some(c => c.baseId === 'CLAV');
     const borderColor = isSelected ? PROTOCOL_COLORS.BLUE : '#475569'; // darker slate-600 for contrast
 
     return (
@@ -924,19 +979,34 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
         >
             {isUpperTooth && (
                 <>
+                    {/* 1. Recuadro Superior (Evolución) */}
                     <div className={cn(
-                        "w-10 h-10 border border-slate-300 mb-2 flex flex-col items-center justify-center bg-white transition-all overflow-hidden",
-                        topSigles.length > 0 ? "border-slate-400 shadow-sm" : "opacity-40"
+                        "w-10 h-10 border-2 border-slate-300 mb-1 flex flex-col items-center justify-center bg-white transition-all overflow-hidden shadow-sm rounded-lg",
+                        topSigles.length > 0 ? "border-slate-400 opacity-100" : "opacity-30"
                     )}>
                         {topSigles.slice(0, 2).map((s, i) => (
                             <span key={i} className="text-[10px] font-black leading-tight" style={{ color: s.color }}>{s.sigla}</span>
                         ))}
                     </div>
-                    <div className={cn("w-full py-1 my-1 flex justify-center transition-all border-y border-slate-100 relative", isSelected ? "bg-blue-600 text-white border-blue-700" : "bg-slate-50 text-slate-900")}>
+
+                    {/* 2. Número de Diente */}
+                    <div className={cn(
+                        "w-full py-1 mb-2 flex justify-center transition-all relative font-black text-[14px]",
+                        isSelected ? "text-blue-600" : "text-slate-800"
+                    )}>
                         {(hasFusion || hasGem) && (
-                            <div className="absolute inset-y-[-6px] -inset-x-3 border-2 border-blue-600/80 rounded-full pointer-events-none z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.8)]" />
+                            <div className="absolute inset-y-[-4px] -inset-x-2 border-[3px] rounded-full pointer-events-none z-10" style={{ borderColor: PROTOCOL_COLORS.BLUE }} />
                         )}
-                        <span className="text-[11px] font-black">{number}</span>
+                        <span className="z-20 relative">{number}</span>
+                    </div>
+
+                    {/* 3. Indicador de Clavija (Superior) con Altura Fija para Alineación */}
+                    <div className="w-full h-8 flex items-center justify-center mb-1">
+                        {hasClav ? (
+                            <svg width="24" height="18" viewBox="0 0 24 24" className="overflow-visible">
+                                <path d="M 12,2 L 2,22 L 22,22 Z" fill="none" stroke={PROTOCOL_COLORS.BLUE} strokeWidth="3" />
+                            </svg>
+                        ) : null}
                     </div>
                 </>
             )}
@@ -1009,46 +1079,43 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                                     <rect key={idx} x={mx - 6} y={my - 6} width={12} height={12} fill={color} />
                                 );
                             case 'arrow_extrude': {
-                                // Pointing occlusal (AWAY from roots): Down
-                                const arrowY = -5;
-                                const dir = -12;
+                                // Según norma COP: Extruida: fuera de la gráfica, apunta LEJOS de oclusal (hacia el exterior)
                                 return (
                                     <path
                                         key={idx}
-                                        d={`M${mx},${arrowY} v${dir} l-4,4 m4,-4 l4,4`}
+                                        d={`M${mx},-3 L${mx},-17 l-4,4 m4,-4 l4,4`}
                                         fill="none" stroke={color} strokeWidth="2"
                                     />
                                 );
                             }
                             case 'arrow_intrude': {
-                                // Pointing apical (TOWARDS roots): Up
-                                const arrowY = -5;
-                                const dir = 12;
+                                // Según norma COP: Intruida: fuera de la gráfica, dirigida HACIA incisal/oclusal (Y=0)
                                 return (
                                     <path
                                         key={idx}
-                                        d={`M${mx},${arrowY} v${dir} l-4,-4 m4,4 l4,-4`}
+                                        d={`M${mx},-17 L${mx},-3 l-4,-4 m4,4 l4,-4`}
                                         fill="none" stroke={color} strokeWidth="2"
                                     />
                                 );
                             }
                             case 'supernumerary_partner': {
-                                // Circle with S between apices
+                                // Según norma COP: La letra "S" encerrada en un círculo azul en la zona oclusal
                                 const parts = cond.id.split(':');
                                 const partnerID = parts[2];
                                 let pIdx = -1;
                                 let nIdx = ALL_TEETH.indexOf(number);
                                 if (partnerID) pIdx = ALL_TEETH.indexOf(parseInt(partnerID));
 
-                                if (pIdx === -1) return null;
-                                const dist = (pIdx - nIdx) * 40; // Approx distance
-                                const cx = mx + dist / 2;
-                                const cy = 50;
+                                // Si es partner, dibujamos entre ambos? La norma dice "hacia la zona oclusal de la pieza"
+                                // Si no hay partnerID (individual), se dibuja sobre el diente actual.
+                                const dist = pIdx !== -1 ? (pIdx - nIdx) * 20 : 0;
+                                const cx = mx + dist;
+                                const cy = -12; // Fuera, zona oclusal
 
                                 return (
                                     <g key={idx}>
-                                        <circle cx={cx} cy={cy} r={8} fill="white" stroke={color} strokeWidth="2" />
-                                        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="black" fill={color}>S</text>
+                                        <circle cx={cx} cy={cy} r={7} fill="white" stroke={color} strokeWidth="2" />
+                                        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="9" fontWeight="black" fill={color}>S</text>
                                     </g>
                                 );
                             }
@@ -1064,22 +1131,11 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                                 );
                             }
                             case 'zigzag_arrow':
-                                return <path key={idx} d={`M10,-10 l5,5 l-5,5 l5,5 v5`} fill="none" stroke={color} strokeWidth="2" />;
-                            case 'surface_mark': // Sellante (S)
-                                return (
-                                    <path
-                                        key={idx}
-                                        d={`M${mx - 3.5},${my} h7 M${mx},${my - 3.5} v7`}
-                                        fill="none"
-                                        stroke={color}
-                                        strokeWidth="4"
-                                        strokeLinecap="round"
-                                    />
-                                );
-                            case 'dotted_line': // PR
-                                return <line key={idx} x1={0} y1={my} x2={30} y2={my} stroke={color} strokeWidth="2" strokeDasharray="4 2" />;
+                                // Según norma COP: Línea zigzag azul hacia oclusal (fuera)
+                                return <path key={idx} d={`M8,-18 l7,3 l-7,3 l7,3 l-7,3`} fill="none" stroke={color} strokeWidth="2" />;
                             case 'curve_arrow': // Giroversión
-                                return <path key={idx} d={`M5,-5 Q15,-15 25,-5 m-3,0 l3,3 l3,-3`} fill="none" stroke={color} strokeWidth="2" />;
+                                // Según norma COP: Flecha curva indicando el sentido
+                                return <path key={idx} d={`M5,-12 Q15,-20 25,-12 m-4,0 l4,4 l4,-4`} fill="none" stroke={color} strokeWidth="2" />;
                             case 'cross_arrows': { // Transposición
                                 const parts = cond.id.split(':');
                                 const partnerID = parts[2];
@@ -1108,17 +1164,43 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                             }
                             case 'slash_line': // Fractura
                                 return <path key={idx} d={`M30,0 L0,50`} fill="none" stroke={color} strokeWidth="3" />;
-                            case 'diastema_parenthesis':
+                            case 'diastema_parenthesis': {
+                                // Según norma COP: Paréntesis invertido )( entre las piezas
+                                // Para que se vea )( entre piezas, el diente de la izquierda (ej 11) debe tener ')' en su borde derecho
+                                // y el diente de la derecha (ej 21) debe tener '(' en su borde izquierdo.
+                                const isRightSide = [1, 4, 5, 8].includes(Math.floor(number / 10)); // Anatomical right (screen left)
+
+                                // Simplified: Draw the parenthesis that corresponds to the mesial side of this tooth
                                 return (
-                                    <g key={idx} stroke={color} strokeWidth={2}>
-                                        <path d={`M0,5 Q-5,15 0,25`} />
-                                        <path d={`M30,5 Q35,15 30,25`} />
+                                    <g key={idx} stroke={color} strokeWidth={3} fill="none" strokeLinecap="round">
+                                        {isRightSide ? (
+                                            /* Signo ')' en el borde derecho (Mesial) para piezas 1x, 4x... */
+                                            <path d="M 30,10 Q 35,25 30,40" />
+                                        ) : (
+                                            /* Signo '(' en el borde izquierdo (Mesial) para piezas 2x, 3x... */
+                                            <path d="M 0,10 Q -5,25 0,40" />
+                                        )}
                                     </g>
                                 );
-                            case 'number_fusion':
-                                return null;
-                            case 'circle_over_number':
-                                return null;
+                            }
+                            case 'number_fusion': {
+                                // Según norma COP: Línea curva azul uniendo las piezas por la corona
+                                const parts = cond.id.split(':');
+                                const partnerID = parts[2];
+                                if (!partnerID) return null;
+                                let pIdx = ALL_TEETH.indexOf(parseInt(partnerID));
+                                let nIdx = ALL_TEETH.indexOf(number);
+                                if (pIdx === -1) return null;
+                                const dist = (pIdx - nIdx) * 32;
+                                return (
+                                    <path key={idx} d={`M ${mx} 15 Q ${mx + dist / 2} 25 ${mx + dist} 15`} fill="none" stroke={color} strokeWidth="2" />
+                                );
+                            }
+                            case 'circle_over_number': // Geminación
+                                // Según norma COP: Línea curva sobre la corona (similar a fusión pero individual)
+                                return (
+                                    <path key={idx} d={`M ${mx - 8} 15 Q ${mx} 25 ${mx + 8} 15`} fill="none" stroke={color} strokeWidth="2" />
+                                );
                             case 'ortho_range':
                             case 'bridge_range': {
                                 const isAnchor = cond.id.endsWith(':ANCHOR');
@@ -1217,24 +1299,33 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
                 </g>
             </svg>
 
-            {/* 3. Número de Diente (Solo para inferiores, para superiores se movió arriba) */}
+            {/* Indicador de Clavija (Inferior) con Altura Fija */}
+            <div className="w-full h-8 flex items-center justify-center mt-1">
+                {!isUpperTooth && hasClav ? (
+                    <svg width="24" height="18" viewBox="0 0 24 24" className="overflow-visible">
+                        <path d="M 12,22 L 2,2 L 22,2 Z" fill="none" stroke={PROTOCOL_COLORS.BLUE} strokeWidth="3" />
+                    </svg>
+                ) : null}
+            </div>
+
+            {/* 3. Número de Diente (Inferiores) */}
             {!isUpperTooth && (
                 <div className={cn(
-                    "w-full py-1 my-1 flex justify-center transition-all border-y border-slate-100 relative",
-                    isSelected ? "bg-blue-600 text-white border-blue-700" : "bg-slate-50 text-slate-900"
+                    "w-full py-1 mt-2 flex justify-center transition-all relative font-black text-[14px]",
+                    isSelected ? "text-blue-600" : "text-slate-800"
                 )}>
                     {(hasFusion || hasGem) && (
-                        <div className="absolute inset-y-[-6px] -inset-x-3 border-2 border-blue-600/80 rounded-full pointer-events-none z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.8)]" />
+                        <div className="absolute inset-y-[-4px] -inset-x-2 border-[3px] rounded-full pointer-events-none z-10" style={{ borderColor: PROTOCOL_COLORS.BLUE }} />
                     )}
-                    <span className="text-[11px] font-black">{number}</span>
+                    <span className="z-20 relative">{number}</span>
                 </div>
             )}
 
-            {/* 4. Recuadro Inferior (Solo para dientes inferiores) */}
+            {/* 4. Recuadro Inferior (Evolución) */}
             {!isUpperTooth && (
                 <div className={cn(
-                    "w-10 h-10 border border-slate-300 mt-1 flex flex-col items-center justify-center bg-white transition-all overflow-hidden",
-                    bottomSigles.length > 0 ? "border-slate-400 shadow-sm" : "opacity-40"
+                    "w-10 h-10 border-2 border-slate-300 mt-1 flex flex-col items-center justify-center bg-white transition-all overflow-hidden shadow-sm rounded-lg",
+                    bottomSigles.length > 0 ? "border-slate-400 opacity-100" : "opacity-30"
                 )}>
                     {bottomSigles.slice(0, 2).map((s, i) => (
                         <span key={i} className="text-[10px] font-black leading-tight" style={{ color: s.color }}>{s.sigla}</span>

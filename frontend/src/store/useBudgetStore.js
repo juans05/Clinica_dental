@@ -193,6 +193,32 @@ const useBudgetStore = create((set, get) => ({
             console.error('Error creating invoice:', e);
             return null;
         }
+    },
+
+    addManualItemToBudget: async (budgetId, itemData) => {
+        try {
+            const r = await api.post(`treatments/${budgetId}/items`, itemData);
+            set(state => ({
+                budgets: state.budgets.map(b => b.id === budgetId ? { ...b, items: [...(b.items || []), r.data] } : b)
+            }));
+            return r.data;
+        } catch (e) {
+            console.error('Error adding manual item:', e);
+            return null;
+        }
+    },
+
+    updateTreatmentPlan: async (id, data) => {
+        try {
+            const r = await api.patch(`treatments/${id}`, data);
+            set(state => ({
+                budgets: state.budgets.map(b => b.id === id ? { ...b, ...r.data } : b)
+            }));
+            return r.data;
+        } catch (e) {
+            console.error('Error updating treatment plan:', e);
+            return null;
+        }
     }
 }));
 
