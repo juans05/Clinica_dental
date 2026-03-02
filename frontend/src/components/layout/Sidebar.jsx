@@ -33,8 +33,6 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
         { icon: Calendar, label: 'Agenda', path: '/agenda', perm: 'agenda:view' },
         { icon: FileText, label: 'Historias', path: '/history', perm: 'history:view' },
         { icon: Shield, label: 'Finanzas', path: '/finance', perm: 'finance:view' },
-        { icon: Shield, label: 'Gestión', path: '/management', perm: 'settings:admin' },
-        { icon: Stethoscope, label: 'Servicios', path: '/services', perm: 'settings:view' },
         { icon: Settings, label: 'Configuración', path: '/settings', perm: 'settings:view' },
     ].filter(item => hasPermission(item.perm));
 

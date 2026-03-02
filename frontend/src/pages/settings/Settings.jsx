@@ -14,10 +14,19 @@ import {
     Clock,
     CreditCard,
     Camera,
-    Loader2
+    Loader2,
+    Building2,
+    Stethoscope,
+    Activity,
+    FileText
 } from 'lucide-react';
 import api from '../../services/api';
 import UsersView from './UsersView';
+import BranchesView from './components/BranchesView';
+import ServicesView from './components/ServicesView';
+import ConsultoriesView from './components/ConsultoriesView';
+import SchedulePanel from './components/SchedulePanel';
+import SeriesPanel from './components/SeriesPanel';
 
 const Settings = () => {
     const [activeTab, setActiveTab] = useState('PROFILE');
@@ -35,16 +44,36 @@ const Settings = () => {
         description: ''
     });
 
+    // Common data for sub-components
+    const [branches, setBranches] = useState([]);
+    const [doctors, setDoctors] = useState([]);
+    const [profiles, setProfiles] = useState([]);
+
     useEffect(() => {
-        fetchCompany();
+        fetchInitialData();
     }, []);
 
-    const fetchCompany = async () => {
+    const fetchInitialData = async () => {
+        setLoading(true);
         try {
-            const res = await api.get('company');
-            setCompany(res.data);
+            const [companyRes, branchesRes, usersRes, profilesRes] = await Promise.all([
+                api.get('company'),
+                api.get('branches'),
+                api.get('auth/users'),
+                api.get('profiles')
+            ]);
+            setCompany(companyRes.data);
+            setBranches(branchesRes.data);
+            setProfiles(profilesRes.data);
+            // Filter doctors from users
+            const allUsers = usersRes.data;
+            setDoctors(allUsers.filter(u =>
+                u.role === 'DENTIST' ||
+                u.profile?.name?.toUpperCase().includes('ODONT') ||
+                u.profile?.name?.toUpperCase().includes('DENT')
+            ));
         } catch (error) {
-            console.error('Error fetching company:', error);
+            console.error('Error fetching initial data:', error);
         } finally {
             setLoading(false);
         }
@@ -80,6 +109,18 @@ const Settings = () => {
         </div>
     );
 
+    const TABS = [
+        { id: 'PROFILE', icon: User, label: 'Mi Perfil' },
+        { id: 'BRANCHES', icon: Building2, label: 'Sedes' },
+        { id: 'USERS', icon: Shield, label: 'Usuarios' },
+        { id: 'SERVICES', icon: Stethoscope, label: 'Servicios' },
+        { id: 'CONSULTORIES', icon: Activity, label: 'Consultorios' },
+        { id: 'SCHEDULES', icon: Clock, label: 'Horarios' },
+        { id: 'SERIES', icon: FileText, label: 'Series' },
+        { id: 'SUBSCRIPTION', icon: CreditCard, label: 'Suscripción' },
+        { id: 'INTEGRATIONS', icon: Zap, label: 'Integraciones' },
+    ];
+
     return (
         <div className="space-y-8 pb-20">
             <div className="flex justify-between items-center">
@@ -87,31 +128,27 @@ const Settings = () => {
                     <h1 className="text-3xl font-black text-slate-800 tracking-tight">Configuración</h1>
                     <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1 italic">Preferencias del Sistema</p>
                 </div>
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="premium-button-primary bg-slate-800 shadow-slate-800/20 disabled:opacity-50"
-                >
-                    {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                    {saving ? 'Guardando...' : 'Guardar Cambios'}
-                </button>
+                {activeTab === 'PROFILE' && (
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="premium-button-primary bg-slate-800 shadow-slate-800/20 disabled:opacity-50"
+                    >
+                        {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                        {saving ? 'Guardando...' : 'Guardar Cambios'}
+                    </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Navigation Sidebar */}
                 <div className="lg:col-span-3 space-y-4">
-                    <nav className="glass-card p-3 rounded-[28px] border border-white/50 space-y-1 shadow-sm">
-                        {[
-                            { id: 'PROFILE', icon: User, label: 'Mi perfil' },
-                            { id: 'USERS', icon: Shield, label: 'Usuarios' },
-                            { id: 'SUBSCRIPTION', icon: CreditCard, label: 'Suscripción' },
-                            { id: 'ADMIN', icon: SettingsIcon, label: 'Administración' },
-                            { id: 'INTEGRATIONS', icon: Zap, label: 'Integraciones' },
-                        ].map((item) => (
+                    <nav className="glass-card p-3 rounded-[28px] border border-white/50 space-y-1 shadow-sm h-fit sticky top-8">
+                        {TABS.map((item) => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
-                                className={`w-full flex items-center gap-3 px-4 py-4 rounded-2xl font-bold text-xs transition-all tracking-wider uppercase ${activeTab === item.id ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+                                className={`w-full flex items-center gap-3 px-4 py-4 rounded-2xl font-bold text-[11px] transition-all tracking-wider uppercase ${activeTab === item.id ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
                                     }`}
                             >
                                 <item.icon size={18} /> {item.label}
@@ -261,11 +298,35 @@ const Settings = () => {
                         </div>
                     )}
 
-                    {activeTab === 'USERS' && (
-                        <UsersView />
+                    {activeTab === 'BRANCHES' && (
+                        <BranchesView onRefresh={fetchInitialData} />
                     )}
 
-                    {['SUBSCRIPTION', 'ADMIN', 'INTEGRATIONS'].includes(activeTab) && (
+                    {activeTab === 'USERS' && (
+                        <UsersView
+                            branches={branches}
+                            profiles={profiles}
+                            onRefresh={fetchInitialData}
+                        />
+                    )}
+
+                    {activeTab === 'SERVICES' && (
+                        <ServicesView />
+                    )}
+
+                    {activeTab === 'CONSULTORIES' && (
+                        <ConsultoriesView branches={branches} />
+                    )}
+
+                    {activeTab === 'SCHEDULES' && (
+                        <SchedulePanel doctors={doctors} branches={branches} />
+                    )}
+
+                    {activeTab === 'SERIES' && (
+                        <SeriesPanel branches={branches} />
+                    )}
+
+                    {['SUBSCRIPTION', 'INTEGRATIONS'].includes(activeTab) && (
                         <div className="h-96 glass-card rounded-[40px] flex flex-center flex-col items-center justify-center space-y-4 text-slate-400 border border-dashed border-slate-200">
                             <Zap size={48} className="opacity-20 animate-pulse text-cyan-400" />
                             <div className="text-center">

@@ -11,7 +11,7 @@ import { twMerge } from 'tailwind-merge';
 
 const cn = (...inputs) => twMerge(clsx(inputs));
 
-const UsersView = () => {
+const UsersView = ({ branches: propBranches, profiles: propProfiles, onRefresh }) => {
     const { user: currentUser } = useAuth();
     const [users, setUsers] = useState([]);
     const [profiles, setProfiles] = useState([]);
@@ -30,27 +30,37 @@ const UsersView = () => {
         profileId: ''
     });
 
+    // Sync from props if they change
     useEffect(() => {
-        fetchData();
-    }, []);
+        if (propProfiles) setProfiles(propProfiles);
+        if (propBranches) setBranches(propBranches);
+    }, [propProfiles, propBranches]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [uRes, pRes, bRes] = await Promise.all([
-                api.get('auth/users'),
-                api.get('profiles'),
-                api.get('branches')
-            ]);
+            const uRes = await api.get('auth/users');
             setUsers(uRes.data);
-            setProfiles(pRes.data);
-            setBranches(bRes.data);
+
+            // If props are not provided, fetch them as fallback
+            if (!propProfiles || !propBranches) {
+                const [pRes, bRes] = await Promise.all([
+                    api.get('profiles'),
+                    api.get('branches')
+                ]);
+                setProfiles(pRes.data);
+                setBranches(bRes.data);
+            }
         } catch (error) {
             console.error('Error fetching users data:', error);
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     const handleOpenModal = (user = null) => {
         if (user) {
@@ -88,8 +98,9 @@ const UsersView = () => {
             } else {
                 await api.post('auth/register', { ...formData, companyId: currentUser.companyId });
             }
-            setShowModal(false);
+            handleCloseModal();
             fetchData();
+            if (onRefresh) onRefresh();
         } catch (error) {
             const msg = error.response?.data?.message || error.message;
             alert('Error al guardar usuario: ' + msg);
