@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma migrate dev --name add_invoice_customer_fields)",
+      "Bash(npx prisma migrate dev --name add_invoice_customer_fields --create-only)",
+      "Bash(npx prisma migrate deploy)",
+      "Bash(npx prisma generate)",
+      "Bash(npm install axios)"
+    ]
+  }
+}

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Save, X, Search, MoreHorizontal, Hash, Info, ClipboardList, Trash2, Activity,
-    History, Lock, Check, CheckCircle, AlertCircle, Box, Calendar
+    History, Lock, Check, CheckCircle, AlertCircle, Box, Calendar, Settings,
+    DollarSign, Plus, ChevronDown
 } from 'lucide-react';
 import useOdontogramStore from '../store/useOdontogramStore';
 import useBudgetStore from '../store/useBudgetStore';
@@ -123,6 +124,209 @@ const MINSA_FINDINGS = [
     { id: 'OFJ', label: 'Aparato Ortodóntico Fijo', sigla: 'OFJ', group: 'ORTHO', type: 'drawing', visual: 'ortho_range' },
     { id: 'ORE', label: 'Aparato Ortodóntico Removible', sigla: 'ORE', group: 'ORTHO', type: 'drawing', visual: 'ortho_zigzag' },
 ];
+
+// Lookup: conditionId → label  (used when building budget preview)
+const FINDING_LABELS = Object.fromEntries(MINSA_FINDINGS.map(f => [f.id, f.label]));
+
+// ─── BudgetPreviewModal ────────────────────────────────────────────────────
+// Shows auto-suggested services from odontogram findings, lets the doctor
+// add / remove / adjust before creating the treatment plan.
+const BudgetPreviewModal = ({ initialItems, patientId, doctorId, onClose, onSuccess }) => {
+    const { services, createBudget } = useBudgetStore();
+    const [items, setItems] = React.useState(initialItems);
+    const [creating, setCreating] = React.useState(false);
+
+    const total = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
+
+    const changeService = (tempId, svcId) => {
+        const svc = services.find(s => s.id === parseInt(svcId));
+        if (!svc) return;
+        setItems(prev => prev.map(it =>
+            it.tempId === tempId ? { ...it, serviceId: svc.id, serviceName: svc.name, price: svc.price } : it
+        ));
+    };
+
+    const changeQty = (tempId, val) => {
+        const qty = Math.max(1, parseInt(val) || 1);
+        setItems(prev => prev.map(it => it.tempId === tempId ? { ...it, quantity: qty } : it));
+    };
+
+    const changeTooth = (tempId, val) => {
+        setItems(prev => prev.map(it => it.tempId === tempId ? { ...it, toothNumber: val } : it));
+    };
+
+    const removeItem = (tempId) => setItems(prev => prev.filter(it => it.tempId !== tempId));
+
+    const addItem = () => {
+        const svc = services[0];
+        if (!svc) return;
+        setItems(prev => [...prev, {
+            tempId: `manual-${Date.now()}`,
+            toothNumber: '',
+            conditionId: '',
+            conditionLabel: 'Ítem manual',
+            serviceId: svc.id,
+            serviceName: svc.name,
+            price: svc.price,
+            quantity: 1,
+        }]);
+    };
+
+    const handleConfirm = async () => {
+        if (items.length === 0) return;
+        setCreating(true);
+        const budgetItems = items.map(it => ({
+            serviceId: it.serviceId,
+            toothNumber: it.toothNumber || null,
+            price: it.price,
+            quantity: it.quantity,
+            notes: it.conditionId ? `Hallazgo: ${it.conditionLabel}` : '',
+        }));
+        const result = await createBudget(
+            patientId,
+            doctorId,
+            budgetItems,
+            'Presupuesto generado desde odontograma.'
+        );
+        setCreating(false);
+        if (result) onSuccess();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
+                    <div>
+                        <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                            <DollarSign size={20} className="text-emerald-500" />
+                            Generar Presupuesto desde Odontograma
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            {items.length} servicio{items.length !== 1 ? 's' : ''} sugerido{items.length !== 1 ? 's' : ''} · Revisa, ajusta y confirma
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-500">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* Table */}
+                <div className="flex-1 overflow-y-auto px-7 py-5">
+                    {items.length === 0 ? (
+                        <div className="text-center py-16 text-slate-400">
+                            <DollarSign size={40} className="mx-auto mb-3 opacity-20" />
+                            <p className="text-sm font-semibold">No hay ítems. Agrega servicios manualmente.</p>
+                        </div>
+                    ) : (
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                    <th className="text-left pb-3 pr-3 w-16">Pieza</th>
+                                    <th className="text-left pb-3 pr-3">Hallazgo</th>
+                                    <th className="text-left pb-3 pr-3">Servicio</th>
+                                    <th className="text-center pb-3 pr-3 w-16">Cant.</th>
+                                    <th className="text-right pb-3 pr-3 w-24">Precio</th>
+                                    <th className="text-right pb-3 w-24">Subtotal</th>
+                                    <th className="pb-3 w-8"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items.map((it) => (
+                                    <tr key={it.tempId} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                        <td className="py-2.5 pr-3">
+                                            <input
+                                                type="text"
+                                                value={it.toothNumber}
+                                                onChange={e => changeTooth(it.tempId, e.target.value)}
+                                                className="w-14 text-center border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-black focus:outline-none focus:border-cyan-400"
+                                                placeholder="—"
+                                                maxLength={3}
+                                            />
+                                        </td>
+                                        <td className="py-2.5 pr-3 max-w-[130px]">
+                                            <span className="text-xs text-slate-500 truncate block">{it.conditionLabel || '—'}</span>
+                                        </td>
+                                        <td className="py-2.5 pr-3">
+                                            <div className="relative">
+                                                <select
+                                                    value={it.serviceId}
+                                                    onChange={e => changeService(it.tempId, e.target.value)}
+                                                    className="w-full border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 text-xs bg-white appearance-none focus:outline-none focus:border-cyan-400"
+                                                >
+                                                    {services.map(svc => (
+                                                        <option key={svc.id} value={svc.id}>{svc.name}</option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                            </div>
+                                        </td>
+                                        <td className="py-2.5 pr-3 text-center">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="99"
+                                                value={it.quantity}
+                                                onChange={e => changeQty(it.tempId, e.target.value)}
+                                                className="w-14 text-center border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-400"
+                                            />
+                                        </td>
+                                        <td className="py-2.5 pr-3 text-right text-xs text-slate-500 font-semibold whitespace-nowrap">
+                                            S/ {it.price.toFixed(2)}
+                                        </td>
+                                        <td className="py-2.5 text-right text-xs font-black text-slate-900 whitespace-nowrap">
+                                            S/ {(it.price * it.quantity).toFixed(2)}
+                                        </td>
+                                        <td className="py-2.5 pl-2">
+                                            <button
+                                                onClick={() => removeItem(it.tempId)}
+                                                className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+
+                    <button
+                        onClick={addItem}
+                        className="mt-4 flex items-center gap-1.5 text-xs font-black text-cyan-600 hover:text-cyan-700 transition-colors"
+                    >
+                        <Plus size={13} /> AGREGAR ÍTEM
+                    </button>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-slate-100 px-7 py-5 flex items-center justify-between bg-slate-50/50 rounded-b-3xl">
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-xs text-slate-500 font-semibold">TOTAL ESTIMADO</span>
+                        <span className="text-2xl font-black text-slate-900">S/ {total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onClose}
+                            className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-100 transition-all"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            disabled={items.length === 0 || creating}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 border border-emerald-700 rounded-xl text-xs font-black text-white hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/30 active:scale-95"
+                        >
+                            <Check size={14} />
+                            {creating ? 'Creando...' : 'Crear Presupuesto'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const getStatusLetter = (data) => {
     const conditions = data?.conditions || [];
@@ -396,15 +600,28 @@ const sc = (tooth, s) => {
     return dataList[0]?.color || null;
 };
 
-const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, onMarkSurface, onSetNote, patientId, activeMode }) => {
+const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, onMarkSurface, onSetNote, patientId, activeMode, readOnlyOverride }) => {
     if (!tooth) return null;
 
     const { fetchToothHistory, toothHistory } = useOdontogramStore();
     const { budgets, fetchBudgets, updateBudgetItem } = useBudgetStore();
+    const { user } = useAuth();
     const [search, setSearch] = React.useState('');
     const [selectedFinding, setSelectedFinding] = React.useState(null);
     const [findingState, setFindingState] = React.useState('BAD');
     const [subSelection, setSubSelection] = React.useState([]); // Multi or single
+    const { syncToothToBudget } = useBudgetStore();
+
+    // Smart default for findingState when selecting a finding
+    React.useEffect(() => {
+        if (selectedFinding) {
+            if (['CARIES', 'OTHERS', 'DDE'].includes(selectedFinding.group)) {
+                setFindingState('BAD');
+            } else if (['RESTORATION', 'SEALANT', 'PROSTHESIS', 'ORTHO'].includes(selectedFinding.group)) {
+                setFindingState('GOOD');
+            }
+        }
+    }, [selectedFinding]);
 
     React.useEffect(() => {
         fetchToothHistory(patientId, number);
@@ -427,10 +644,26 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
         }
     };
 
-    const filteredFindings = MINSA_FINDINGS.filter(f =>
-        f.label.toLowerCase().includes(search.toLowerCase()) ||
-        f.sigla.toLowerCase().includes(search.toLowerCase())
-    );
+    const handleSetEvolutionState = async (newState) => {
+        useOdontogramStore.getState().setEvolutionState(number, newState);
+
+        // Update budget items for this tooth
+        const statusMap = {
+            'CURADO': 'COMPLETED',
+            'CANCELADO': 'CANCELLED',
+            'PENDIENTE': 'PENDING'
+        };
+
+        const targetStatus = statusMap[newState];
+        if (targetStatus && approvedItems.length > 0) {
+            for (const item of approvedItems) {
+                if (item.status !== targetStatus) {
+                    await updateBudgetItem(item.id, { status: targetStatus });
+                }
+            }
+            fetchBudgets(patientId);
+        }
+    };
 
     const handleApplyFinding = () => {
         if (!selectedFinding) return;
@@ -445,17 +678,34 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
             onMarkTooth(number, `${finalId}:${findingState}:${subSelection[0]}`);
         } else {
             // Final string: "ID:STATUS:SUB1,SUB2..."
-            onMarkTooth(number, `${finalId}:${findingState}${subSelection.length > 0 ? `:${subSelection.join(',')}` : ''}`);
+            const condition = `${finalId}:${findingState}${subSelection.length > 0 ? `:${subSelection.join(',')}` : ''}`;
+            if (selectedFinding.requiresSurfaces) {
+                if (tooth.selectedSurfaces?.length > 0) {
+                    tooth.selectedSurfaces.forEach(s => {
+                        onMarkSurface(number, s, condition);
+                    });
+                }
+            } else {
+                onMarkTooth(number, condition);
+            }
         }
 
-        setSelectedFinding(null);
-        setSubSelection([]);
-        onClose(); // Close the modal after applying
+        if (activeMode === 'INITIAL') {
+            setTimeout(() => {
+                syncToothToBudget(patientId, user?.id, number, useOdontogramStore.getState().teeth[number]);
+            }, 100);
+        }
+
+        onClose();
     };
 
-    const isReadOnly = activeMode === 'INITIAL' && tooth.saved;
+    const filteredFindings = MINSA_FINDINGS.filter(f =>
+        f.label.toLowerCase().includes(search.toLowerCase()) ||
+        f.sigla.toLowerCase().includes(search.toLowerCase())
+    );
 
-    // Sub-select configurations
+    const isReadOnly = readOnlyOverride || (activeMode === 'INITIAL' && tooth.saved);
+
     const getSubOptions = () => {
         if (!selectedFinding) return null;
         if (selectedFinding.id === 'MOB') return ['M1', 'M2', 'M3'];
@@ -463,16 +713,10 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
         if (selectedFinding.id === 'FUS' || selectedFinding.id === 'TRA' || selectedFinding.id === 'SUPERNUMERARY') {
             const neighbors = [];
             const pos = ALL_TEETH.indexOf(number);
-
-            // Basic neighbors in the list
             if (pos > 0) neighbors.push(ALL_TEETH[pos - 1]);
             if (pos < ALL_TEETH.length - 1) neighbors.push(ALL_TEETH[pos + 1]);
-
-            // Filter to only kept neighbors in same row (upper vs lower)
             const isU = isUpper(number);
             const validNeighbors = neighbors.filter(n => isUpper(n) === isU);
-
-            // Manual overlaps for center teeth
             if (number === 11 && !validNeighbors.includes(21)) validNeighbors.push(21);
             if (number === 21 && !validNeighbors.includes(11)) validNeighbors.push(11);
             if (number === 31 && !validNeighbors.includes(41)) validNeighbors.push(41);
@@ -481,7 +725,6 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
             if (number === 61 && !validNeighbors.includes(51)) validNeighbors.push(51);
             if (number === 71 && !validNeighbors.includes(81)) validNeighbors.push(81);
             if (number === 81 && !validNeighbors.includes(71)) validNeighbors.push(71);
-
             return [...new Set(validNeighbors)].map(String);
         }
         if (['OFJ', 'ORE', 'PF', 'PR', 'PT', 'EDENTULO'].includes(selectedFinding.id)) {
@@ -526,8 +769,8 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 lg:grid-cols-12 gap-10 custom-scrollbar">
-                    {/* Col 1: Surface & Selectors (3 cols) */}
-                    <div className="lg:col-span-3 space-y-8">
+                    {/* Col 1: Surface & Selectors */}
+                    <div className={cn(activeMode === 'EVOLUTION' ? "lg:col-span-6" : "lg:col-span-3", "space-y-8")}>
                         <div className="bg-slate-50/50 rounded-[32px] border border-slate-100 p-8 shadow-inner">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                                 <Box size={14} /> MAPA DE SUPERFICIES
@@ -574,242 +817,186 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
                         </div>
                     </div>
 
-                    {/* Col 2: Finding Search & Selection (5 cols) */}
-                    <div className="lg:col-span-5 space-y-6 lg:border-x lg:px-10 border-slate-100">
-                        <div className="space-y-4">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">AÑADIR CONDICIÓN</h3>
-                            <div className="relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por nombre o sigla (Ej: CDP, Caries...)"
-                                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 outline-none"
-                                    value={search}
-                                    onChange={e => setSearch(e.target.value)}
-                                />
-                            </div>
+                    {/* Col 2: Finding Search & Selection */}
+                    {activeMode !== 'EVOLUTION' && (
+                        <div className="lg:col-span-5 space-y-6 lg:border-x lg:px-10 border-slate-100">
+                            <div className="space-y-4">
+                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">AÑADIR CONDICIÓN</h3>
+                                <div className="relative">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por nombre o sigla..."
+                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                        value={search}
+                                        onChange={e => setSearch(e.target.value)}
+                                    />
+                                </div>
+                                <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar space-y-6">
+                                    {[
+                                        { id: 'CARIES', label: 'Lesión de Caries' },
+                                        { id: 'DDE', label: 'Defectos de Esmalte' },
+                                        { id: 'RESTORATION', label: 'Restauraciones' },
+                                        { id: 'SEALANT', label: 'Sellantes' },
+                                        { id: 'PULPAR', label: 'Tratamiento Pulpar' },
+                                        { id: 'PROSTHESIS', label: 'Prótesis y Coronas' },
+                                        { id: 'POSITION', label: 'Anomalías y Posición' },
+                                        { id: 'ORTHO', label: 'Ortodoncia' },
+                                        { id: 'OTHERS', label: 'Otros Hallazgos' },
+                                    ].map(group => {
+                                        const findingsInGroup = filteredFindings.filter(f => f.group === group.id);
+                                        if (findingsInGroup.length === 0) return null;
 
-                            <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar space-y-6">
-                                {[
-                                    { id: 'CARIES', label: 'Lesión de Caries' },
-                                    { id: 'DDE', label: 'Defectos de Esmalte' },
-                                    { id: 'RESTORATION', label: 'Restauraciones' },
-                                    { id: 'SEALANT', label: 'Sellantes' },
-                                    { id: 'PULPAR', label: 'Tratamiento Pulpar' },
-                                    { id: 'PROSTHESIS', label: 'Prótesis y Coronas' },
-                                    { id: 'POSITION', label: 'Anomalías y Posición' },
-                                    { id: 'ORTHO', label: 'Ortodoncia' },
-                                    { id: 'OTHERS', label: 'Otros Hallazgos' },
-                                ].map(group => {
-                                    const findingsInGroup = filteredFindings.filter(f => f.group === group.id);
-                                    if (findingsInGroup.length === 0) return null;
-
-                                    return (
-                                        <div key={group.id} className="space-y-3">
-                                            <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-1">{group.label}</h4>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {findingsInGroup.map(f => (
-                                                    <button
-                                                        key={f.id}
-                                                        disabled={isReadOnly}
-                                                        onClick={() => {
-                                                            setSelectedFinding(f);
-                                                            setSubSelection([]);
-                                                        }}
-                                                        className={cn(
-                                                            "p-3 rounded-xl border transition-all text-left flex items-center justify-between group h-full",
-                                                            selectedFinding?.id === f.id
-                                                                ? "bg-slate-900 border-slate-900 text-white shadow-lg"
-                                                                : "bg-white border-slate-100 text-slate-600 hover:border-blue-200"
-                                                        )}
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div
-                                                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                                                style={{ backgroundColor: f.color || (f.group === 'CARIES' ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE) }}
-                                                            />
-                                                            <span className="font-bold text-[10px] leading-tight uppercase">{f.label}</span>
-                                                        </div>
-                                                        {selectedFinding?.id === f.id && <Check size={14} className="text-blue-400" />}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {selectedFinding && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="bg-blue-50 p-6 rounded-[32px] border border-blue-100 mt-4 space-y-6"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-[11px] font-black text-blue-700 uppercase tracking-widest">Configurar Estado</p>
-                                        <div className="flex bg-white/50 p-1.5 rounded-2xl border border-blue-100">
-                                            <button
-                                                onClick={() => setFindingState('GOOD')}
-                                                className={cn(
-                                                    "px-4 py-2 rounded-xl text-[10px] font-black transition-all flex items-center gap-2",
-                                                    findingState === 'GOOD' ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                                                )}
-                                            >
-                                                <CheckCircle size={14} /> SANO
-                                            </button>
-                                            <button
-                                                onClick={() => setFindingState('BAD')}
-                                                className={cn(
-                                                    "px-4 py-2 rounded-xl text-[10px] font-black transition-all flex items-center gap-2",
-                                                    findingState === 'BAD' ? "bg-white text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                                                )}
-                                            >
-                                                <AlertCircle size={14} /> PATOLÓGICO
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {subOptions && (
-                                        <div className="space-y-3">
-                                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Opción de {selectedFinding.label}</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {subOptions.map(opt => (
-                                                    <button
-                                                        key={opt}
-                                                        onClick={() => {
-                                                            if (selectedFinding.group === 'POSITION' || ['OFJ', 'ORE', 'PF', 'PR', 'PT'].includes(selectedFinding.id)) {
-                                                                setSubSelection(prev => prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt]);
-                                                            } else {
-                                                                setSubSelection([opt]);
-                                                            }
-                                                        }}
-                                                        className={cn(
-                                                            "px-4 py-2 rounded-xl text-[11px] font-black border transition-all",
-                                                            subSelection.includes(opt)
-                                                                ? "bg-blue-600 border-blue-700 text-white shadow-md shadow-blue-200"
-                                                                : "bg-white border-blue-100 text-blue-600 hover:bg-blue-100/20"
-                                                        )}
-                                                    >
-                                                        {opt}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <button
-                                        onClick={handleApplyFinding}
-                                        className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[12px] font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
-                                    >
-                                        REGISTRAR HALLAZGO
-                                    </button>
-                                </motion.div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Col 3: Active Findings & History (4 cols) */}
-                    <div className="lg:col-span-4 space-y-8">
-                        <div>
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                <Activity size={14} className="text-rose-500" /> Hallazgos Activos
-                            </h3>
-                            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                {(() => {
-                                    const toothConditions = (tooth.conditions || []).map(c => ({ str: c, surface: null }));
-                                    const surfaceConditions = Object.entries(tooth.surfaces || {}).flatMap(([s, items]) =>
-                                        (items || []).map(c => ({ str: c, surface: s }))
-                                    );
-                                    const all = [...toothConditions, ...surfaceConditions];
-
-                                    if (all.length === 0) return <p className="text-[11px] text-slate-300 italic pl-2">Ninguno registrado</p>;
-
-                                    return all.map((item, idx) => {
-                                        const cond = getConditionData(item.str);
-                                        if (!cond) return null;
                                         return (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50/80 rounded-[24px] border border-slate-100 group">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cond.color }} />
-                                                    <div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{cond.sigla}</p>
-                                                            {item.surface && (
-                                                                <span className="text-[9px] font-black bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md">{item.surface}</span>
+                                            <div key={group.id} className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-1">{group.label}</h4>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {findingsInGroup.map(f => (
+                                                        <button
+                                                            key={f.id}
+                                                            onClick={() => {
+                                                                setSelectedFinding(f);
+                                                                setSubSelection([]);
+                                                            }}
+                                                            className={cn(
+                                                                "p-3 rounded-xl border transition-all text-left flex items-center justify-between group h-full",
+                                                                selectedFinding?.id === f.id
+                                                                    ? "bg-slate-900 border-slate-900 text-white shadow-lg"
+                                                                    : "bg-white border-slate-100 text-slate-600 hover:border-blue-200"
                                                             )}
-                                                        </div>
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mt-1 truncate max-w-[140px]">{cond.label}</p>
-                                                    </div>
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div
+                                                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                                    style={{ backgroundColor: f.color || (f.group === 'CARIES' ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE) }}
+                                                                />
+                                                                <span className="font-bold text-[10px] leading-tight uppercase truncate">{f.label}</span>
+                                                            </div>
+                                                            {selectedFinding?.id === f.id && <Check size={14} className="text-blue-400" />}
+                                                        </button>
+                                                    ))}
                                                 </div>
-                                                {!isReadOnly && (
-                                                    <button
-                                                        onClick={() => item.surface ? onMarkSurface(number, item.surface, item.str) : onMarkTooth(number, item.str)}
-                                                        className="text-slate-200 hover:text-rose-500 transition-colors"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                )}
                                             </div>
                                         );
-                                    });
-                                })()}
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Col 3: Details & History */}
+                    <div className={cn(activeMode === 'EVOLUTION' ? "lg:col-span-6" : "lg:col-span-4", "space-y-8")}>
+                        {selectedFinding && (
+                            <div className="bg-blue-50 p-8 rounded-[32px] border border-blue-100 space-y-6">
+                                <h3 className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-2">
+                                    <Settings size={14} /> CONFIGURAR ESTADO
+                                </h3>
+                                <div className="flex bg-white/50 p-1 rounded-2xl border border-blue-100">
+                                    <button onClick={() => setFindingState('GOOD')} className={cn("flex-1 py-1.5 rounded-xl text-[10px] font-black transition-all", findingState === 'GOOD' ? "bg-white shadow-sm" : "text-slate-400")}>SANO</button>
+                                    <button onClick={() => setFindingState('BAD')} className={cn("flex-1 py-1.5 rounded-xl text-[10px] font-black transition-all", findingState === 'BAD' ? "bg-white shadow-sm" : "text-slate-400")}>PATOLÓGICO</button>
+                                </div>
+
+                                {subOptions && (
+                                    <div className="space-y-3 pt-2">
+                                        <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest pl-1">Especifique:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {subOptions.map(opt => (
+                                                <button
+                                                    key={opt}
+                                                    onClick={() => {
+                                                        if (['OFJ', 'ORE', 'PF', 'PR', 'PT', 'EDENTULO'].includes(selectedFinding.id)) {
+                                                            const current = subSelection.map(Number);
+                                                            if (current.includes(Number(opt))) {
+                                                                setSubSelection(current.filter(n => n !== Number(opt)).map(String));
+                                                            } else {
+                                                                setSubSelection([...current, Number(opt)].sort((a, b) => a - b).map(String));
+                                                            }
+                                                        } else {
+                                                            setSubSelection([opt]);
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        "px-3 py-2 rounded-xl border text-[10px] font-black transition-all",
+                                                        subSelection.includes(opt) ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200" : "bg-white border-blue-100 text-blue-600 hover:border-blue-300"
+                                                    )}
+                                                >
+                                                    {opt}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeMode === 'EVOLUTION' && (
+                            <div className="bg-emerald-50/50 p-8 rounded-[32px] border border-emerald-100 space-y-6">
+                                <h3 className="text-[11px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-2">
+                                    <CheckCircle size={14} /> ESTADO DE EVOLUCIÓN
+                                </h3>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {[
+                                        { id: 'CURADO', label: 'Curado / Restaurado', color: 'text-emerald-600', bg: 'bg-emerald-100/50', border: 'border-emerald-200' },
+                                        { id: 'PENDIENTE', label: 'Pendiente de curar', color: 'text-amber-600', bg: 'bg-amber-100/50', border: 'border-amber-200' },
+                                        { id: 'CANCELADO', label: 'Cancelado', color: 'text-slate-600', bg: 'bg-slate-100/50', border: 'border-slate-200' },
+                                    ].map(s => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => handleSetEvolutionState(s.id)}
+                                            className={cn("w-full p-4 rounded-2xl border transition-all text-[11px] font-black uppercase flex items-center justify-between", tooth.evolutionState === s.id ? `${s.bg} ${s.border} ${s.color}` : "bg-white text-slate-400")}
+                                        >
+                                            {s.label}
+                                            {tooth.evolutionState === s.id && <Check size={16} />}
+                                        </button>
+                                    ))}
+                                    <button onClick={() => handleSetEvolutionState(null)} className="w-full p-3 text-[10px] font-bold text-slate-400 uppercase">Limpiar estado</button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-4">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Activity size={14} className="text-rose-500" /> Hallazgos Activos
+                            </h3>
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                {(tooth.conditions || []).map((c, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <span className="text-[11px] font-black text-slate-800 uppercase">{c}</span>
+                                        {!isReadOnly && <button onClick={() => onMarkTooth(number, c)} className="text-slate-300 hover:text-rose-500"><Trash2 size={14} /></button>}
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
                         {activeMode === 'EVOLUTION' && approvedItems.length > 0 && (
-                            <div className="pt-4 border-t border-slate-100">
-                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                    <CheckCircle size={14} className="text-emerald-500" /> Presupuesto Aprobado
+                            <div className="pt-4 border-t border-slate-100 space-y-4">
+                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <CheckCircle size={14} className="text-emerald-500" /> Presupuesto
                                 </h3>
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     {approvedItems.map(item => (
-                                        <div key={item.id} className={cn(
-                                            "p-4 rounded-[24px] border transition-all flex items-center justify-between",
-                                            item.status === 'COMPLETED' ? "bg-emerald-50 border-emerald-100 op-60" : "bg-white border-slate-100 shadow-sm"
-                                        )}>
-                                            <div>
-                                                <p className="text-[10px] font-black text-slate-800 uppercase">{item.service?.name}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tight">S/ {parseFloat(item.price).toFixed(2)}</p>
-                                            </div>
+                                        <div key={item.id} className={cn("p-3 rounded-xl border flex items-center justify-between", item.status === 'COMPLETED' ? "bg-emerald-50 opacity-60" : "bg-white shadow-sm")}>
+                                            <span className="text-[10px] font-black truncate max-w-[150px]">{item.service?.name}</span>
                                             {item.status !== 'COMPLETED' ? (
-                                                <button
-                                                    onClick={() => handleCompleteItem(item)}
-                                                    className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all active:scale-95"
-                                                >
-                                                    Finalizar
-                                                </button>
+                                                <button onClick={() => handleCompleteItem(item)} className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-[9px] font-black">Finalizar</button>
                                             ) : (
-                                                <div className="flex items-center gap-1.5 text-emerald-600">
-                                                    <Check size={14} />
-                                                    <span className="text-[9px] font-black uppercase">Terminado</span>
-                                                </div>
+                                                <Check size={14} className="text-emerald-600" />
                                             )}
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         )}
-
-                        <div>
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                <History size={14} className="text-indigo-400" /> Historial Clínico
+                        <div className="space-y-4">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <History size={14} className="text-indigo-400" /> Historial
                             </h3>
-                            <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                                {toothHistory && toothHistory.length > 0 ? (
-                                    toothHistory.map((log) => (
-                                        <div key={log.id} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <p className="text-[10px] font-black text-slate-700 leading-tight">{log.description}</p>
-                                                <span className="text-[9px] font-bold text-slate-400">{new Date(log.createdAt).toLocaleDateString()}</span>
-                                            </div>
-                                            <p className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">{log.doctor?.name}</p>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
-                                        <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Sin antecedentes</p>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                                {toothHistory?.map(log => (
+                                    <div key={log.id} className="p-3 bg-white border border-slate-100 rounded-xl shadow-sm text-[10px] font-medium">
+                                        {log.description}
                                     </div>
-                                )}
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -817,10 +1004,10 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
 
                 <div className="p-8 bg-white border-t border-slate-100 flex justify-end">
                     <button
-                        onClick={onClose}
-                        className="px-12 py-3.5 bg-slate-900 text-white rounded-xl text-[12px] font-black hover:bg-black transition-all shadow-lg active:scale-95 uppercase tracking-widest"
+                        onClick={selectedFinding ? handleApplyFinding : onClose}
+                        className={cn("px-12 py-4 rounded-2xl text-[12px] font-black transition-all shadow-xl uppercase tracking-widest", selectedFinding ? "bg-blue-600 text-white" : "bg-slate-900 text-white")}
                     >
-                        LISTO
+                        {selectedFinding ? 'REGISTRAR HALLAZGO' : 'LISTO'}
                     </button>
                 </div>
             </motion.div>
@@ -1359,16 +1546,27 @@ const Odontograma = ({ patientId }) => {
         globalSpecifications,
         globalObservations,
         setGlobalSpecifications,
-        setGlobalObservations
+        setGlobalObservations,
+        // Multi-visit
+        allVisits,
+        currentVisitId,
+        isReadOnlyVisit,
+        switchVisit,
+        createNewVisit,
     } = useOdontogramStore();
 
     const { user } = useAuth();
-    const { createBudgetFromOdontogram } = useBudgetStore();
+    const { createBudgetFromOdontogram, syncAllToBudget, fetchServices, services, buildBudgetPreview } = useBudgetStore();
     const navigate = useNavigate();
 
     const [activeOdoTab, setActiveOdoTab] = React.useState('initial');
     const [saved, setSaved] = React.useState(false);
     const [detailTooth, setDetailTooth] = React.useState(null);
+    const [showNewVisitModal, setShowNewVisitModal] = React.useState(false);
+    const [newVisitNotes, setNewVisitNotes] = React.useState('');
+    const [creatingVisit, setCreatingVisit] = React.useState(false);
+    const [showBudgetModal, setShowBudgetModal] = React.useState(false);
+    const [previewItems, setPreviewItems] = React.useState([]);
 
     React.useEffect(() => {
         if (patientId) fetchOdontogram(patientId);
@@ -1377,9 +1575,39 @@ const Odontograma = ({ patientId }) => {
     const handleSave = async () => {
         if (patientId) {
             await saveOdontogram(patientId);
+            if (user?.id) {
+                await syncAllToBudget(patientId, user.id, teeth);
+            }
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         }
+    };
+
+    const handleOpenBudgetPreview = async () => {
+        // Persiste hallazgos antes de generar presupuesto.
+        // El modal navega fuera del odontograma al confirmar;
+        // sin este guardado los hallazgos se pierden al desmontar el componente.
+        if (dirty && patientId) {
+            await saveOdontogram(patientId);
+        }
+
+        if (services.length === 0) await fetchServices();
+
+        const items = buildBudgetPreview(teeth, FINDING_LABELS);
+        if (items.length === 0) {
+            alert('No se encontraron hallazgos que requieran tratamiento. Registra hallazgos en el odontograma primero.');
+            return;
+        }
+        setPreviewItems(items);
+        setShowBudgetModal(true);
+    };
+
+    const handleCreateNewVisit = async () => {
+        setCreatingVisit(true);
+        await createNewVisit(patientId, newVisitNotes);
+        setCreatingVisit(false);
+        setShowNewVisitModal(false);
+        setNewVisitNotes('');
     };
 
     if (loading) return (
@@ -1529,6 +1757,7 @@ const Odontograma = ({ patientId }) => {
     });
 
     return (
+        <>
         <div className="pt-2">
             <AnimatePresence>
                 {detailTooth && (
@@ -1537,6 +1766,7 @@ const Odontograma = ({ patientId }) => {
                         tooth={teeth[detailTooth.number]}
                         patientId={patientId}
                         activeMode={activeMode}
+                        readOnlyOverride={isReadOnlyVisit}
                         onClose={() => setDetailTooth(null)}
                         onMarkTeeth={markTeeth}
                         onMarkTooth={markTooth}
@@ -1574,6 +1804,116 @@ const Odontograma = ({ patientId }) => {
                 </div>
             </div>
 
+            {/* ── Visit History Panel ── */}
+            {allVisits.length > 0 && (
+                <div className="flex items-center gap-3 mb-4 px-1 flex-wrap">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap flex items-center gap-1.5">
+                        <Calendar size={11} /> Consultas:
+                    </span>
+                    <div className="flex gap-2 flex-wrap flex-1">
+                        {[...allVisits].reverse().map((visit, idx) => {
+                            const isActive = visit.id === currentVisitId;
+                            const isLatest = visit.id === allVisits[0].id;
+                            const date = new Date(visit.visitDate || visit.createdAt).toLocaleDateString('es-PE');
+                            return (
+                                <button
+                                    key={visit.id}
+                                    onClick={() => switchVisit(visit.id)}
+                                    className={cn(
+                                        'px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all',
+                                        isActive
+                                            ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100'
+                                            : isLatest
+                                                ? 'bg-slate-900 text-white border-slate-900'
+                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                                    )}
+                                >
+                                    <span className="opacity-60">Consulta {idx + 1}</span>
+                                    <span className="ml-1.5">{date}</span>
+                                    {isLatest && !isActive && <span className="ml-1 text-emerald-400">●</span>}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <button
+                        onClick={() => setShowNewVisitModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[10px] font-black hover:bg-emerald-100 transition-all whitespace-nowrap"
+                    >
+                        + Nueva Consulta
+                    </button>
+                </div>
+            )}
+
+            {/* Read-only banner for past visits */}
+            {isReadOnlyVisit && (
+                <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-4">
+                    <div className="flex items-center gap-2.5">
+                        <Lock size={16} className="text-amber-600" />
+                        <div>
+                            <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Consulta anterior — Solo lectura</p>
+                            <p className="text-[10px] text-amber-600 mt-0.5">Este odontograma es histórico y no puede modificarse. Selecciona la consulta más reciente para editar o crea una nueva.</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => switchVisit(allVisits[0].id)}
+                            className="px-4 py-2 bg-amber-600 text-white rounded-xl text-[10px] font-black hover:bg-amber-700 transition-all"
+                        >
+                            Ir a actual
+                        </button>
+                        <button
+                            onClick={() => setShowNewVisitModal(true)}
+                            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black hover:bg-black transition-all"
+                        >
+                            + Nueva consulta
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* New Visit Modal */}
+            <AnimatePresence>
+                {showNewVisitModal && (
+                    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.97 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.97 }}
+                            className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 space-y-6 mx-4"
+                        >
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800">Nueva Consulta</h2>
+                                <p className="text-[11px] text-slate-400 mt-1">Se creará un nuevo odontograma en blanco para esta visita. El anterior quedará guardado como consulta histórica.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Notas de la sesión (opcional)</label>
+                                <textarea
+                                    value={newVisitNotes}
+                                    onChange={e => setNewVisitNotes(e.target.value)}
+                                    placeholder="Ej: Control post-operatorio, revisión rutinaria..."
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none h-28"
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowNewVisitModal(false)}
+                                    className="flex-1 py-3 border border-slate-200 rounded-xl text-[11px] font-black text-slate-500 hover:bg-slate-50 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateNewVisit}
+                                    disabled={creatingVisit}
+                                    className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[11px] font-black hover:bg-black transition-all disabled:opacity-50"
+                                >
+                                    {creatingVisit ? 'Creando...' : '✓ Crear nueva consulta'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* ── Sub Header: Legend & Actions ── */}
             <div className="flex items-center justify-between mb-8 px-4">
                 <div className="flex items-center gap-8">
@@ -1588,6 +1928,13 @@ const Odontograma = ({ patientId }) => {
                 </div>
 
                 <div className="flex gap-3">
+                    <button
+                        onClick={handleOpenBudgetPreview}
+                        disabled={isReadOnlyVisit}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 border border-emerald-700 rounded-xl text-[12px] font-black text-white hover:bg-emerald-700 transition-all shadow-md shadow-emerald-500/20 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <DollarSign size={16} /> GENERAR PRESUPUESTO
+                    </button>
                     <button
                         onClick={handleExportPDF}
                         className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[12px] font-black text-white hover:bg-black transition-all shadow-md active:scale-95"
@@ -1734,6 +2081,21 @@ const Odontograma = ({ patientId }) => {
                 )
             }
         </div>
+
+        {/* ── Budget Preview Modal ── */}
+        {showBudgetModal && (
+            <BudgetPreviewModal
+                initialItems={previewItems}
+                patientId={patientId}
+                doctorId={user?.id}
+                onClose={() => setShowBudgetModal(false)}
+                onSuccess={() => {
+                    setShowBudgetModal(false);
+                    navigate(`/expediente/${patientId}/budgets`);
+                }}
+            />
+        )}
+        </>
     );
 };
 

@@ -1,61 +1,102 @@
 const prisma = require('../utils/prisma');
 
-// GET /api/odontograms/:patientId — get last odontogram for patient
+// GET /api/odontograms/:patientId — get all odontograms for patient (sorted newest first)
 const getOdontogram = async (req, res) => {
     try {
         const patientId = parseInt(req.params.patientId);
         const companyId = parseInt(req.user.companyId);
 
-        // Verify patient belongs to company
         const patient = await prisma.patient.findFirst({ where: { id: patientId, companyId } });
         if (!patient) return res.status(404).json({ message: 'Paciente no encontrado' });
 
-        const odontogram = await prisma.odontogram.findFirst({
+        // Return ALL odontograms sorted newest first
+        const odontograms = await prisma.odontogram.findMany({
             where: { patientId },
-            orderBy: { updatedAt: 'desc' },
+            orderBy: { visitDate: 'desc' },
         });
 
-        res.json(odontogram || null);
+        // For backwards compatibility, also return "current" as the latest one
+        res.json({ all: odontograms, current: odontograms[0] || null });
     } catch (error) {
         console.error('Error getOdontogram:', error);
         res.status(500).json({ message: 'Error al obtener odontograma', detail: error.message });
     }
 };
 
-// PUT /api/odontograms/:patientId — upsert odontogram (create or update)
+// POST /api/odontograms/:patientId/new — create a brand new visit odontogram
+const createNewVisit = async (req, res) => {
+    try {
+        const patientId = parseInt(req.params.patientId);
+        const companyId = parseInt(req.user.companyId);
+        const doctorId = parseInt(req.user.id || req.user.userId);
+        const { sessionNotes, visitDate } = req.body;
+
+        const patient = await prisma.patient.findFirst({ where: { id: patientId, companyId } });
+        if (!patient) return res.status(404).json({ message: 'Paciente no encontrado' });
+
+        const odontogram = await prisma.odontogram.create({
+            data: {
+                patientId,
+                doctorId: !isNaN(doctorId) ? doctorId : undefined,
+                data: {},
+                visitDate: visitDate ? new Date(visitDate) : new Date(),
+                sessionNotes: sessionNotes || null,
+            }
+        });
+
+        res.status(201).json(odontogram);
+    } catch (error) {
+        console.error('Error createNewVisit:', error);
+        res.status(500).json({ message: 'Error al crear nueva visita', detail: error.message });
+    }
+};
+
+// PUT /api/odontograms/:patientId — update the CURRENT (latest) odontogram for patient
 const saveOdontogram = async (req, res) => {
     try {
         const patientId = parseInt(req.params.patientId);
         const companyId = parseInt(req.user.companyId);
         const doctorId = parseInt(req.user.id || req.user.userId);
-        const { data, logs } = req.body;
+        const { data, logs, sessionNotes, odontogramId } = req.body;
 
         if (isNaN(doctorId)) {
             return res.status(403).json({ message: 'Sesión inválida: No se pudo identificar al odontólogo.' });
         }
-
         if (!data) return res.status(400).json({ message: 'Se requiere el campo data' });
 
-        // Verify patient belongs to company
         const patient = await prisma.patient.findFirst({ where: { id: patientId, companyId } });
         if (!patient) return res.status(404).json({ message: 'Paciente no encontrado' });
 
-        // Upsert odontogram
-        const existing = await prisma.odontogram.findFirst({
-            where: { patientId },
-            orderBy: { updatedAt: 'desc' },
-        });
-
         let odontogram;
-        if (existing) {
+
+        if (odontogramId) {
+            // Update a specific odontogram by ID
             odontogram = await prisma.odontogram.update({
-                where: { id: existing.id },
-                data: { data },
+                where: { id: parseInt(odontogramId) },
+                data: { data, ...(sessionNotes !== undefined && { sessionNotes }) },
             });
         } else {
-            odontogram = await prisma.odontogram.create({
-                data: { patientId, data },
+            // Upsert: find the most recent one or create new
+            const existing = await prisma.odontogram.findFirst({
+                where: { patientId },
+                orderBy: { visitDate: 'desc' },
             });
+
+            if (existing) {
+                odontogram = await prisma.odontogram.update({
+                    where: { id: existing.id },
+                    data: { data, ...(sessionNotes !== undefined && { sessionNotes }) },
+                });
+            } else {
+                odontogram = await prisma.odontogram.create({
+                    data: {
+                        patientId,
+                        doctorId: !isNaN(doctorId) ? doctorId : undefined,
+                        data,
+                        sessionNotes: sessionNotes || null,
+                    }
+                });
+            }
         }
 
         // Process logs if any
@@ -78,14 +119,12 @@ const saveOdontogram = async (req, res) => {
                 });
             } catch (logError) {
                 console.error('Error saving odontogram logs:', logError);
-                // We continue even if logs fail, but we log the error
             }
         }
 
         res.json(odontogram);
     } catch (error) {
         console.error('CRITICAL ERROR saveOdontogram:', error);
-        console.error('Payload attempted:', { patientId, logsLength: logs?.length });
         res.status(500).json({ message: 'Error al guardar odontograma', detail: error.message });
     }
 };
@@ -125,4 +164,4 @@ const resetOdontogram = async (req, res) => {
     }
 };
 
-module.exports = { getOdontogram, saveOdontogram, resetOdontogram, getToothHistory };
+module.exports = { getOdontogram, saveOdontogram, resetOdontogram, getToothHistory, createNewVisit };

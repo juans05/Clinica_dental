@@ -19,8 +19,17 @@ const cn = (...inputs) => twMerge(clsx(inputs));
 const STATUS_MAP = {
     PENDING: { label: 'Pendiente', color: 'bg-amber-50 text-amber-600 border-amber-100', icon: Clock },
     APPROVED: { label: 'Aprobado', color: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: CheckCircle },
+    PARTIAL_PAYMENT: { label: 'Pago Parcial', color: 'bg-sky-50 text-sky-600 border-sky-100', icon: DollarSign },
+    PENDING_PAYMENT: { label: 'Pend. Pago', color: 'bg-orange-50 text-orange-600 border-orange-100', icon: DollarSign },
+    PAID: { label: 'Pagado', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle },
     REJECTED: { label: 'Rechazado', color: 'bg-rose-50 text-rose-600 border-rose-100', icon: AlertCircle },
     COMPLETED: { label: 'Completado', color: 'bg-blue-50 text-blue-600 border-blue-100', icon: CheckCircle },
+};
+
+const ITEM_STATUS = {
+    PENDING: { label: 'Pendiente', cls: 'bg-slate-50 text-slate-400 border-slate-200' },
+    COMPLETED: { label: 'Terminado', cls: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+    INVOICED: { label: '✓ Facturado', cls: 'bg-indigo-50 text-indigo-700 border-indigo-100' },
 };
 
 const BudgetModule = ({ patientId, patientName }) => {
@@ -37,9 +46,14 @@ const BudgetModule = ({ patientId, patientName }) => {
     });
     const [paymentForm, setPaymentForm] = useState({ budgetId: null, amount: '', method: 'CASH' });
     const [activeInvoice, setActiveInvoice] = useState(null);
+    const [selectedItemIds, setSelectedItemIds] = useState([]);
     const [company, setCompany] = useState(null);
+    const [invoiceLoading, setInvoiceLoading] = useState(false);
+    const [invoiceError, setInvoiceError] = useState('');
     const [showBillingModal, setShowBillingModal] = useState(false);
     const [billingForm, setBillingForm] = useState(null);
+    const [activePaymentTab, setActivePaymentTab] = useState('EFECTIVO');
+    const [showPaymentForm, setShowPaymentForm] = useState(false);
     const { patient } = usePatientStore();
 
     useEffect(() => {
@@ -100,14 +114,32 @@ const BudgetModule = ({ patientId, patientName }) => {
         }
     };
 
-    const handlePrepareInvoice = (budget, type) => {
-        const pendingItems = budget.items.filter(i => i.status !== 'COMPLETED');
-        if (pendingItems.length > 0) {
-            return alert(`Hay ${pendingItems.length} procedimientos pendientes. Todos los ítems deben estar "Terminados" para generar el comprobante.`);
-        }
+    const handlePrepareInvoice = (budget, type, preSelectedIds = null) => {
         if (!budget || !budget.items) return;
 
-        const items = budget.items.filter(i => i.status === 'COMPLETED');
+        // Validar series en la sede
+        const branch = budget.branch;
+        if (!branch) {
+            return alert('El presupuesto no tiene una sede asignada. No se puede generar el comprobante.');
+        }
+
+        if (type === 'BOLETA' && !branch.seriesBoleta) {
+            return alert(`La sede "${branch.name}" no tiene configurada una serie para BOLETAS. Configúrela en Gestión de Clínica -> Series.`);
+        }
+        if (type === 'FACTURA' && !branch.seriesFactura) {
+            return alert(`La sede "${branch.name}" no tiene configurada una serie para FACTURAS. Configúrela en Gestión de Clínica -> Series.`);
+        }
+
+        // Solo facturar ítems COMPLETED que aún no estén INVOICED
+        const billableItems = budget.items.filter(i => i.status === 'COMPLETED');
+        if (billableItems.length === 0) {
+            return alert('No hay procedimientos "Terminados" disponibles para documentar. Marca al menos uno como Terminado antes de generar el comprobante.');
+        }
+        // Use pre-selected IDs if provided, otherwise all billable
+        const idsToUse = preSelectedIds || billableItems.map(i => i.id);
+        const items = billableItems.filter(i => idsToUse.includes(i.id));
+        if (items.length === 0) return;
+
         const total = items.reduce((acc, i) => acc + (i.price * i.quantity * (1 - (i.discount || 0) / 100)), 0);
         const subtotal = total / 1.18;
         const igv = total - subtotal;
@@ -115,13 +147,14 @@ const BudgetModule = ({ patientId, patientName }) => {
         setBillingForm({
             budget,
             type,
-            customerName: patient?.name || '',
-            documentType: patient?.documentType || 'DNI',
-            documentId: patient?.documentId || '',
-            address: patient?.address || '',
+            razonSocial: patient?.firstName ? `${patient.firstName} ${patient.lastName || ''}`.trim() : '',
+            tipoDocumento: patient?.documentType || 'DNI',
+            nroDocumento: patient?.documentId || '',
+            direccionCliente: patient?.address || '',
             email: patient?.email || '',
             items,
-            subtotal,
+            itemIds: items.map(i => i.id),
+            montoSinIgv: subtotal,
             igv,
             total,
             payments: [{
@@ -134,7 +167,21 @@ const BudgetModule = ({ patientId, patientName }) => {
             }]
         });
         setActivePaymentTab('EFECTIVO');
+        setShowPaymentForm(false);
+        setInvoiceError('');
         setShowBillingModal(true);
+    };
+
+    const handleLookupByDocument = async () => {
+        if (!billingForm?.nroDocumento || billingForm.nroDocumento.length < 8) return;
+        try {
+            // Buscamos si el paciente ya tiene estos datos o si podemos jalarlos de la empresa/sunat
+            // Por ahora, si es el mismo DNI del paciente, ya lo tenemos.
+            // Si es otro, podríamos implementar una búsqueda real aquí.
+            console.log('Buscando documento:', billingForm.nroDocumento);
+        } catch (err) {
+            console.error('Error en búsqueda de documento:', err);
+        }
     };
 
     const handleAddPaymentRow = (method) => {
@@ -171,24 +218,33 @@ const BudgetModule = ({ patientId, patientName }) => {
     };
 
     const handleUpdatePayment = (id, updates) => {
-        setBillingForm({
-            ...billingForm,
-            payments: billingForm.payments.map(p => {
+        setBillingForm(current => {
+            if (!current) return current;
+            const newPayments = current.payments.map(p => {
                 if (p.id === id) {
                     const updated = { ...p, ...updates };
-                    if (updated.method === 'CASH') {
-                        const paid = parseFloat(updated.amount || 0);
-                        const total = billingForm.total;
-                        const otherPayments = billingForm.payments
+
+                    // Si se marca "TODO", auto-completar con el saldo restante
+                    if (updates.isComplete === true) {
+                        const otherPaymentsTotal = current.payments
                             .filter(op => op.id !== id)
                             .reduce((acc, op) => acc + parseFloat(op.amount || 0), 0);
-                        const remaining = total - otherPayments;
+                        updated.amount = Math.max(0, current.total - otherPaymentsTotal);
+                    }
+
+                    if (updated.method === 'CASH') {
+                        const paid = parseFloat(updated.amount || 0);
+                        const otherPayments = current.payments
+                            .filter(op => op.id !== id)
+                            .reduce((acc, op) => acc + parseFloat(op.amount || 0), 0);
+                        const remaining = current.total - otherPayments;
                         updated.change = paid > remaining ? paid - remaining : 0;
                     }
                     return updated;
                 }
                 return p;
-            })
+            });
+            return { ...current, payments: newPayments };
         });
     };
 
@@ -196,17 +252,48 @@ const BudgetModule = ({ patientId, patientName }) => {
     const isPaymentReached = totalPaid >= (billingForm?.total || 0);
 
     const handleConfirmInvoice = async () => {
-        const res = await createInvoice({
-            number: `${billingForm.type === 'BOLETA' ? 'B' : 'F'}${Date.now().toString().slice(-6)}`,
-            type: billingForm.type,
-            total: billingForm.total,
-            patientId,
-            treatmentPlanId: billingForm.budget.id,
-        });
-        if (res) {
-            setShowBillingModal(false);
-            setActiveInvoice({ ...res, items: billingForm.items, budgetName: billingForm.budget.name });
-            fetchBudgets(patientId);
+        setInvoiceLoading(true);
+        setInvoiceError('');
+        try {
+            const payload = {
+                type: billingForm.type,
+                montoConIgv: billingForm.total,
+                montoSinIgv: billingForm.montoSinIgv,
+                igv: billingForm.igv,
+                patientId,
+                treatmentPlanId: billingForm.budget.id,
+                razonSocial: billingForm.razonSocial,
+                tipoDocumento: billingForm.tipoDocumento,
+                nroDocumento: billingForm.nroDocumento,
+                direccionCliente: billingForm.direccionCliente,
+                email: billingForm.email,
+                items: billingForm.items.map(i => ({
+                    nombreProducto: `${i.service?.name}${i.toothNumber ? ` (Pieza ${i.toothNumber})` : ''}`,
+                    cantidad: i.quantity,
+                    total: i.price * i.quantity * (1 - (i.discount || 0) / 100),
+                    serviceId: i.serviceId || i.service?.id,
+                    toothNumber: i.toothNumber,
+                })),
+                itemIds: billingForm.itemIds,
+                payments: billingForm.payments.filter(p => parseFloat(p.amount) > 0),
+            };
+            const res = await createInvoice(payload);
+            if (res.ok) {
+                setShowBillingModal(false);
+                setActiveInvoice({
+                    ...res.data,
+                    total: res.data.montoConIgv,
+                    items: billingForm.items,
+                    budgetName: billingForm.budget.name
+                });
+                fetchBudgets(patientId);
+            } else {
+                setInvoiceError(res.error || 'Error al generar el comprobante');
+            }
+        } catch (err) {
+            setInvoiceError(err?.response?.data?.message || 'Error al generar el comprobante');
+        } finally {
+            setInvoiceLoading(false);
         }
     };
 
@@ -280,7 +367,7 @@ const BudgetModule = ({ patientId, patientName }) => {
             }
         });
 
-        const fileName = `Presupuesto_${patientName}_${budget.id}.pdf`;
+        const fileName = `Presupuesto_${patientName}_${budget.number ?? budget.id}.pdf`;
         if (action === 'print') {
             doc.autoPrint();
             window.open(doc.output('bloburl'), '_blank');
@@ -377,7 +464,7 @@ const BudgetModule = ({ patientId, patientName }) => {
                                 <div className="flex items-center gap-5">
                                     <div className={cn("h-14 w-14 rounded-2xl flex items-center justify-center", isExpanded ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400")}><FileText size={24} /></div>
                                     <div>
-                                        <div className="flex items-center gap-3"><h3 className="font-black text-slate-800">{budget.name || `Presupuesto #${budget.id}`}</h3><span className={cn("px-2 py-0.5 rounded-full text-[8px] font-black uppercase border", status.color)}>{status.label}</span></div>
+                                        <div className="flex items-center gap-3"><h3 className="font-black text-slate-800">{budget.name || `Presupuesto #${budget.number ?? budget.id}`}</h3><span className={cn("px-2 py-0.5 rounded-full text-[8px] font-black uppercase border", status.color)}>{status.label}</span></div>
                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{new Date(budget.createdAt).toLocaleDateString()} · Dr. {budget.doctor?.name}</p>
                                     </div>
                                 </div>
@@ -509,31 +596,68 @@ const BudgetModule = ({ patientId, patientName }) => {
                                             </div>
                                             <div className="space-y-4">
                                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><FileText size={14} /> Facturación</h4>
-                                                <div className="bg-slate-900 p-6 rounded-[32px] shadow-xl space-y-4">
+                                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
                                                     {budget.status === 'PENDING' ? (
-                                                        <div className="space-y-4">
-                                                            <p className="text-[9px] text-slate-400 font-medium">El cliente debe aceptar el presupuesto para facturar.</p>
+                                                        <div className="space-y-3">
+                                                            <p className="text-[10px] text-slate-500 font-medium">El paciente debe aceptar el presupuesto antes de facturar.</p>
                                                             <button
                                                                 onClick={async () => {
                                                                     await useBudgetStore.getState().updateTreatmentPlan(budget.id, { status: 'APPROVED' });
                                                                     fetchBudgets(patientId);
                                                                 }}
-                                                                className="w-full py-4 bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg shadow-indigo-500/20"
+                                                                className="w-full py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all"
                                                             >
-                                                                Aprobar Presupuesto
+                                                                ✓ Aprobar Presupuesto
                                                             </button>
                                                         </div>
-                                                    ) : (
-                                                        <>
-                                                            <p className="text-[9px] text-slate-400 font-medium">Emitir comprobante electrónico por este plan.</p>
-                                                            <div className="grid grid-cols-2 gap-3">
-                                                                <button onClick={() => handleCreateInvoice(budget, 'BOLETA')} className="py-3 bg-white/10 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-white/20 border border-white/10 transition-all">Boleta</button>
-                                                                <button onClick={() => handleCreateInvoice(budget, 'FACTURA')} className="py-3 bg-white/10 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-white/20 border border-white/10 transition-all">Factura</button>
+                                                    ) : (() => {
+                                                        const completedItems = budget.items.filter(i => i.status === 'COMPLETED');
+                                                        const invoicedItems = budget.items.filter(i => i.status === 'INVOICED');
+                                                        const hasReady = completedItems.length > 0;
+                                                        const completedTotal = completedItems.reduce((acc, i) => acc + (i.price * i.quantity * (1 - (i.discount || 0) / 100)), 0);
+                                                        return (
+                                                            <div className="space-y-3">
+                                                                {hasReady && (
+                                                                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5">
+                                                                        <p className="text-[10px] font-black text-emerald-700">
+                                                                            {completedItems.length} item{completedItems.length > 1 ? 's' : ''} listo{completedItems.length > 1 ? 's' : ''} · S/ {completedTotal.toFixed(2)}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                                {invoicedItems.length > 0 && (
+                                                                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2">
+                                                                        <p className="text-[10px] font-bold text-indigo-700">
+                                                                            ✓ {invoicedItems.length} ya facturado{invoicedItems.length > 1 ? 's' : ''}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                                {!hasReady && (
+                                                                    <p className="text-[9px] text-slate-400 text-center py-1">
+                                                                        Marca procedimientos como "Terminado" para documentarlos.
+                                                                    </p>
+                                                                )}
+                                                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                                                    <button
+                                                                        onClick={() => handlePrepareInvoice(budget, 'BOLETA')}
+                                                                        disabled={!hasReady}
+                                                                        className="py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        📄 Boleta
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handlePrepareInvoice(budget, 'FACTURA')}
+                                                                        disabled={!hasReady}
+                                                                        className="py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        🧾 Factura
+                                                                    </button>
+                                                                </div>
                                                             </div>
-                                                        </>
-                                                    )}
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
+
                                         </div>
                                     </motion.div>
                                 )}
@@ -549,350 +673,341 @@ const BudgetModule = ({ patientId, patientName }) => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[300] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+                        className="fixed inset-0 z-[300] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
                     >
                         <motion.div
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            initial={{ scale: 0.96, opacity: 0, y: 16 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
-                            className="bg-white/90 backdrop-blur-md w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden border border-white/40 flex flex-col my-auto"
+                            className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto"
                         >
-                            {/* Modal Header */}
-                            <div className="p-8 border-b border-slate-100/50 flex justify-between items-center bg-white/50">
+                            {/* Header */}
+                            <div className="px-7 py-5 border-b border-slate-100 flex items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100">
-                                        <FileText size={24} />
+                                    <div className="w-10 h-10 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                                        <FileText size={18} />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-black text-slate-900 tracking-tight">Generar Comprobante</h3>
-                                        <div className="flex gap-2 mt-1">
-                                            <button
-                                                onClick={() => setBillingForm({ ...billingForm, type: 'BOLETA' })}
-                                                className={cn(
-                                                    "text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest transition-all border",
-                                                    billingForm.type === 'BOLETA' ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100" : "bg-white text-slate-600 border-slate-300 hover:border-indigo-300"
-                                                )}
-                                            >
-                                                Boleta Electrónica
-                                            </button>
-                                            <button
-                                                onClick={() => setBillingForm({ ...billingForm, type: 'FACTURA' })}
-                                                className={cn(
-                                                    "text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest transition-all border",
-                                                    billingForm.type === 'FACTURA' ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100" : "bg-white text-slate-600 border-slate-300 hover:border-indigo-300"
-                                                )}
-                                            >
-                                                Factura Electrónica
-                                            </button>
+                                        <h3 className="text-base font-black text-slate-900">Generar Comprobante</h3>
+                                        <div className="flex gap-1.5 mt-1">
+                                            {['BOLETA', 'FACTURA'].map(t => (
+                                                <button key={t}
+                                                    onClick={() => setBillingForm({ ...billingForm, type: t, tipoDocumento: t === 'FACTURA' ? 'RUC' : 'DNI' })}
+                                                    className={cn(
+                                                        'text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider transition-all border',
+                                                        billingForm.type === t
+                                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                                            : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
+                                                    )}
+                                                >{t} ELECTRÓNICA</button>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
-                                <button onClick={() => setShowBillingModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400">
-                                    <X size={20} />
+                                <button onClick={() => setShowBillingModal(false)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-colors">
+                                    <X size={18} />
                                 </button>
                             </div>
 
-                            <div className="p-8 space-y-8 overflow-y-auto max-h-[70vh]">
-                                {/* Customer Data Section */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="md:col-span-2 space-y-2">
-                                        <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Nombre / Razón Social</label>
+                            <div className="overflow-y-auto max-h-[75vh]">
+
+                                {/* ① Datos del Cliente */}
+                                <div className="px-7 pt-6 pb-5 space-y-4">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">① Datos del Cliente</p>
+                                    <div className="flex gap-3">
+                                        <select
+                                            value={billingForm.tipoDocumento}
+                                            onChange={e => setBillingForm({ ...billingForm, tipoDocumento: e.target.value })}
+                                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-black text-indigo-700 outline-none focus:border-indigo-300 shrink-0"
+                                        >
+                                            <option value="DNI">DNI</option>
+                                            <option value="RUC">RUC</option>
+                                            <option value="CE">C.E.</option>
+                                        </select>
                                         <input
                                             type="text"
-                                            value={billingForm.customerName}
-                                            onChange={e => setBillingForm({ ...billingForm, customerName: e.target.value })}
-                                            className="w-full bg-slate-50/80 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-300 outline-none transition-all"
-                                            placeholder="Nombre del cliente..."
+                                            value={billingForm.nroDocumento}
+                                            onChange={e => setBillingForm({ ...billingForm, nroDocumento: e.target.value })}
+                                            onBlur={handleLookupByDocument}
+                                            placeholder="Número de documento..."
+                                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-300 outline-none transition-all"
                                         />
+                                        <button
+                                            onClick={handleLookupByDocument}
+                                            className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-700 transition-all shrink-0"
+                                        >Buscar</button>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">{billingForm.documentType}</label>
-                                        <div className="flex gap-2">
-                                            <select
-                                                value={billingForm.documentType}
-                                                onChange={e => setBillingForm({ ...billingForm, documentType: e.target.value })}
-                                                className="bg-slate-50/80 border border-slate-200 rounded-2xl px-3 py-3 text-[10px] font-black text-indigo-700 outline-none focus:border-indigo-300"
-                                            >
-                                                <option value="DNI">DNI</option>
-                                                <option value="RUC">RUC</option>
-                                                <option value="CE">C.E.</option>
-                                            </select>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nombre / Razón Social</label>
                                             <input
                                                 type="text"
-                                                value={billingForm.documentId}
-                                                onChange={e => setBillingForm({ ...billingForm, documentId: e.target.value })}
-                                                className="flex-1 bg-slate-50/80 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-300 outline-none transition-all"
-                                                placeholder="Número..."
+                                                value={billingForm.razonSocial}
+                                                onChange={e => setBillingForm({ ...billingForm, razonSocial: e.target.value })}
+                                                placeholder="Nombre del cliente..."
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-300 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Email <span className="normal-case font-medium">(opcional)</span></label>
+                                            <input
+                                                type="email"
+                                                value={billingForm.email}
+                                                onChange={e => setBillingForm({ ...billingForm, email: e.target.value })}
+                                                placeholder="correo@ejemplo.com"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-300 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Dirección <span className="normal-case font-medium">(opcional)</span></label>
+                                            <input
+                                                type="text"
+                                                value={billingForm.direccionCliente}
+                                                onChange={e => setBillingForm({ ...billingForm, direccionCliente: e.target.value })}
+                                                placeholder="Dirección fiscal..."
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-300 outline-none transition-all"
                                             />
                                         </div>
                                     </div>
-                                    <div className="md:col-span-2 space-y-2">
-                                        <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Dirección</label>
-                                        <input
-                                            type="text"
-                                            value={billingForm.address}
-                                            onChange={e => setBillingForm({ ...billingForm, address: e.target.value })}
-                                            className="w-full bg-slate-50/80 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-300 outline-none transition-all"
-                                            placeholder="Dirección fiscal..."
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1">Email (Envío Electrónico)</label>
-                                        <input
-                                            type="email"
-                                            value={billingForm.email}
-                                            onChange={e => setBillingForm({ ...billingForm, email: e.target.value })}
-                                            className="w-full bg-slate-50/80 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-300 outline-none transition-all"
-                                            placeholder="correo@ejemplo.com"
-                                        />
-                                    </div>
                                 </div>
 
-                                {/* Items Detail Section */}
-                                <div className="space-y-4">
-                                    <h4 className="text-[11px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
-                                        <div className="w-6 h-px bg-slate-300"></div> Detalle de la factura
-                                    </h4>
-                                    <div className="rounded-[24px] border border-slate-200 overflow-hidden shadow-sm">
+                                <div className="mx-7 border-t border-dashed border-slate-200" />
+
+                                {/* ② Detalle de Servicios */}
+                                <div className="px-7 pt-5 pb-5 space-y-3">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">② Detalle de Servicios</p>
+                                    <div className="rounded-2xl border border-slate-200 overflow-hidden">
                                         <table className="w-full text-left">
-                                            <thead className="bg-slate-100 text-[9px] font-black text-slate-600 uppercase tracking-widest border-b border-slate-200">
+                                            <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                                 <tr>
-                                                    <th className="px-6 py-4">Descripción</th>
-                                                    <th className="px-4 py-4 text-center">Cant.</th>
-                                                    <th className="px-4 py-4 text-right">Valor Unit.</th>
-                                                    <th className="px-4 py-4 text-right">IGV (18%)</th>
-                                                    <th className="px-6 py-4 text-right">Monto Total</th>
+                                                    <th className="px-5 py-3">Descripción</th>
+                                                    <th className="px-4 py-3 text-center">Cant.</th>
+                                                    <th className="px-5 py-3 text-right">Total</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100 text-[11px] font-bold text-slate-700 bg-white">
+                                            <tbody className="divide-y divide-slate-100 text-sm font-bold text-slate-700">
                                                 {billingForm.items.map((item, idx) => (
                                                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="px-6 py-4">{item.service?.name} {item.toothNumber && `(Pieza ${item.toothNumber})`}</td>
-                                                        <td className="px-4 py-4 text-center">{item.quantity}</td>
-                                                        <td className="px-4 py-4 text-right text-slate-500">S/ {(item.price * (1 - (item.discount || 0) / 100) / 1.18).toFixed(2)}</td>
-                                                        <td className="px-4 py-4 text-right text-slate-500">S/ {(item.price * (1 - (item.discount || 0) / 100) - (item.price * (1 - (item.discount || 0) / 100) / 1.18)).toFixed(2)}</td>
-                                                        <td className="px-6 py-4 text-right text-indigo-700">S/ {(item.price * item.quantity * (1 - (item.discount || 0) / 100)).toFixed(2)}</td>
+                                                        <td className="px-5 py-3">
+                                                            {item.service?.name}
+                                                            {item.toothNumber && <span className="ml-1 text-slate-400 font-medium text-xs">(Pieza {item.toothNumber})</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center text-slate-500">{item.quantity}</td>
+                                                        <td className="px-5 py-3 text-right text-indigo-700 font-black">
+                                                            S/ {(item.price * item.quantity * (1 - (item.discount || 0) / 100)).toFixed(2)}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
                                         </table>
+                                        <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex justify-between items-center">
+                                            <div className="flex gap-5 text-[11px] text-slate-500">
+                                                <span>Subtotal: <span className="font-black text-slate-700">S/ {billingForm.montoSinIgv.toFixed(2)}</span></span>
+                                                <span>IGV 18%: <span className="font-black text-slate-700">S/ {billingForm.igv.toFixed(2)}</span></span>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total a Pagar</p>
+                                                <p className="text-2xl font-black text-slate-900 tabular-nums">S/ {billingForm.total.toFixed(2)}</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Summary & Payment Section */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
-                                    <div className="space-y-4">
-                                        <h4 className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Resumen de Totales</h4>
-                                        <div className="space-y-3 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                                            <div className="flex justify-between text-[11px] font-bold text-slate-500 uppercase tracking-tight">
-                                                <span>Subtotal (Inafecto/Exonerado)</span>
-                                                <span className="text-slate-700">S/ {billingForm.subtotal.toFixed(2)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-[11px] font-bold text-slate-500 uppercase tracking-tight">
-                                                <span>IGV (18.00%)</span>
-                                                <span className="text-slate-700">S/ {billingForm.igv.toFixed(2)}</span>
-                                            </div>
-                                            <div className="w-full h-px bg-slate-200 my-1"></div>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Total Soles a Pagar</span>
-                                                <span className="text-3xl font-black text-slate-900 tracking-tighter">S/ {billingForm.total.toFixed(2)}</span>
-                                            </div>
-                                        </div>
+                                <div className="mx-7 border-t border-dashed border-slate-200" />
+
+                                {/* ③ Forma de Pago */}
+                                <div className="px-7 pt-5 pb-6 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">③ Forma de Pago</p>
+                                        {!isPaymentReached && (
+                                            <button
+                                                onClick={() => setShowPaymentForm(v => !v)}
+                                                className={cn(
+                                                    'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all',
+                                                    showPaymentForm ? 'bg-slate-100 text-slate-600' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-100'
+                                                )}
+                                            >
+                                                {showPaymentForm ? <X size={12} /> : <Plus size={12} />}
+                                                {showPaymentForm ? 'Cerrar' : 'Agregar pago'}
+                                            </button>
+                                        )}
                                     </div>
-                                    <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
-                                        <div className="flex flex-col items-center gap-2 mb-2">
-                                            <h4 className="text-sm font-black text-slate-800 tracking-tight">Elige un método de pago</h4>
-                                            <p className="text-[10px] font-bold text-slate-400">Agrega un método de pago para tu recibo generado</p>
-                                        </div>
 
-                                        {/* Payment Tabs */}
-                                        <div className="flex border-b border-slate-100">
-                                            {[
-                                                { id: 'EFECTIVO', method: 'CASH' },
-                                                { id: 'TARJETA', method: 'CARD' },
-                                                { id: 'ABONO EN CUENTA', method: 'TRANSFER' },
-                                                { id: 'APLICATIVO', method: 'APP' }
-                                            ].map(tab => (
-                                                <button
-                                                    key={tab.id}
-                                                    onClick={() => setActivePaymentTab(tab.id)}
-                                                    className={cn(
-                                                        "px-6 py-4 text-[10px] font-black tracking-widest transition-all relative",
-                                                        activePaymentTab === tab.id ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
-                                                    )}
-                                                >
-                                                    {tab.id}
-                                                    {activePaymentTab === tab.id && (
-                                                        <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
-                                                    )}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        {/* Active Tab Content */}
-                                        <div className="pt-4 space-y-4">
-                                            <div className="inline-flex items-center px-4 py-2 bg-indigo-50 border border-dashed border-indigo-200 rounded-xl">
-                                                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
-                                                    Tabla de pago {activePaymentTab.toLowerCase()}
-                                                </span>
-                                            </div>
-
-                                            <div className="bg-slate-50/50 rounded-[28px] border border-slate-100 p-2 overflow-hidden">
-                                                <table className="w-full text-left">
-                                                    <thead className="text-[9px] font-black text-slate-900 uppercase tracking-widest">
-                                                        <tr>
-                                                            <th className="px-4 py-4">Moneda</th>
-                                                            {activePaymentTab === 'TARJETA' && <th className="px-4 py-4">Tipo Tarjeta</th>}
-                                                            {activePaymentTab === 'TARJETA' && <th className="px-4 py-4">Lote</th>}
-                                                            {(activePaymentTab === 'TARJETA' || activePaymentTab === 'APLICATIVO' || activePaymentTab === 'ABONO EN CUENTA') && <th className="px-4 py-4">Referencia</th>}
-                                                            {activePaymentTab === 'APLICATIVO' && <th className="px-4 py-4">Tipo Aplicativo</th>}
-                                                            <th className="px-4 py-4 text-center">Monto</th>
-                                                            {activePaymentTab === 'EFECTIVO' && <th className="px-4 py-4 text-center">Vuelto</th>}
-                                                            <th className="px-4 py-4 text-center">Acciones</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white rounded-2xl divide-y divide-slate-50">
-                                                        {billingForm.payments.filter(p => p.method === (activePaymentTab === 'EFECTIVO' ? 'CASH' : activePaymentTab === 'TARJETA' ? 'CARD' : activePaymentTab === 'ABONO EN CUENTA' ? 'TRANSFER' : 'APP')).map(p => (
-                                                            <tr key={p.id}>
-                                                                <td className="px-4 py-3">
-                                                                    <select
-                                                                        value={p.currency}
-                                                                        onChange={e => handleUpdatePayment(p.id, { currency: e.target.value })}
-                                                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 outline-none focus:border-indigo-300"
-                                                                    >
-                                                                        <option value="SOLES">SOLES</option>
-                                                                        <option value="DOLARES">DOLARES</option>
+                                    <AnimatePresence>
+                                        {showPaymentForm && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                    {[
+                                                        { id: 'EFECTIVO', method: 'CASH', icon: '💵' },
+                                                        { id: 'TARJETA', method: 'CARD', icon: '💳' },
+                                                        { id: 'TRANSFERENCIA', method: 'TRANSFER', icon: '🏦' },
+                                                        { id: 'APLICATIVO', method: 'APP', icon: '📱' },
+                                                    ].map(tab => (
+                                                        <button
+                                                            key={tab.id}
+                                                            onClick={() => {
+                                                                setActivePaymentTab(tab.id);
+                                                                const hasRows = billingForm.payments.some(p => p.method === tab.method);
+                                                                if (!hasRows && !isPaymentReached) handleAddPaymentRow(tab.method);
+                                                            }}
+                                                            className={cn(
+                                                                'flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black border transition-all',
+                                                                activePaymentTab === tab.id
+                                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100'
+                                                                    : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                                                            )}
+                                                        >
+                                                            <span>{tab.icon}</span> {tab.id}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="space-y-3">
+                                                    {billingForm.payments
+                                                        .filter(p => p.method === (
+                                                            activePaymentTab === 'EFECTIVO' ? 'CASH' :
+                                                                activePaymentTab === 'TARJETA' ? 'CARD' :
+                                                                    activePaymentTab === 'TRANSFERENCIA' ? 'TRANSFER' : 'APP'
+                                                        ))
+                                                        .map(p => (
+                                                            <div key={p.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-wrap items-end gap-3">
+                                                                <div className="space-y-1">
+                                                                    <label className="text-[9px] font-black text-slate-400 uppercase block">Moneda</label>
+                                                                    <select value={p.currency} onChange={e => handleUpdatePayment(p.id, { currency: e.target.value })} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[11px] font-black text-slate-700 outline-none focus:border-indigo-300">
+                                                                        <option value="SOLES">S/ Soles</option>
+                                                                        <option value="DOLARES">$ Dólares</option>
                                                                     </select>
-                                                                </td>
-                                                                {activePaymentTab === 'TARJETA' && (
-                                                                    <td className="px-4 py-3">
-                                                                        <select
-                                                                            value={p.cardType}
-                                                                            onChange={e => handleUpdatePayment(p.id, { cardType: e.target.value })}
-                                                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 outline-none focus:border-indigo-300"
-                                                                        >
-                                                                            <option value="">ELIGE UNA TARJETA</option>
+                                                                </div>
+                                                                {activePaymentTab === 'TARJETA' && (<>
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-black text-slate-400 uppercase block">Tarjeta</label>
+                                                                        <select value={p.cardType} onChange={e => handleUpdatePayment(p.id, { cardType: e.target.value })} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[11px] font-black text-slate-700 outline-none focus:border-indigo-300">
+                                                                            <option value="">Tipo...</option>
                                                                             <option value="VISA">VISA</option>
                                                                             <option value="MASTERCARD">MASTERCARD</option>
                                                                             <option value="AMEX">AMEX</option>
                                                                         </select>
-                                                                    </td>
-                                                                )}
-                                                                {activePaymentTab === 'TARJETA' && (
-                                                                    <td className="px-4 py-3">
-                                                                        <input
-                                                                            type="text"
-                                                                            value={p.lot}
-                                                                            onChange={e => handleUpdatePayment(p.id, { lot: e.target.value })}
-                                                                            className="w-20 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 text-center focus:bg-white outline-none transition-all"
-                                                                        />
-                                                                    </td>
-                                                                )}
-                                                                {(activePaymentTab === 'TARJETA' || activePaymentTab === 'APLICATIVO' || activePaymentTab === 'ABONO EN CUENTA') && (
-                                                                    <td className="px-4 py-3">
-                                                                        <input
-                                                                            type="text"
-                                                                            value={p.reference}
-                                                                            onChange={e => handleUpdatePayment(p.id, { reference: e.target.value })}
-                                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:bg-white outline-none transition-all"
-                                                                        />
-                                                                    </td>
-                                                                )}
+                                                                    </div>
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-black text-slate-400 uppercase block">N° Lote</label>
+                                                                        <input type="text" value={p.lot} onChange={e => handleUpdatePayment(p.id, { lot: e.target.value })} placeholder="Lote..." className="w-24 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:border-indigo-300 outline-none" />
+                                                                    </div>
+                                                                </>)}
                                                                 {activePaymentTab === 'APLICATIVO' && (
-                                                                    <td className="px-4 py-3">
-                                                                        <select
-                                                                            value={p.appType}
-                                                                            onChange={e => handleUpdatePayment(p.id, { appType: e.target.value })}
-                                                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 outline-none focus:border-indigo-300"
-                                                                        >
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-black text-slate-400 uppercase block">App</label>
+                                                                        <select value={p.appType} onChange={e => handleUpdatePayment(p.id, { appType: e.target.value })} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[11px] font-black text-slate-700 outline-none focus:border-indigo-300">
                                                                             <option value="YAPE">YAPE</option>
                                                                             <option value="PLIN">PLIN</option>
                                                                         </select>
-                                                                    </td>
+                                                                    </div>
                                                                 )}
-                                                                <td className="px-4 py-3">
-                                                                    <div className="flex flex-col items-center gap-1">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={p.isComplete}
-                                                                                onChange={e => handleUpdatePayment(p.id, { isComplete: e.target.checked })}
-                                                                                className="w-4 h-4 rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                                            />
-                                                                            <span className="text-[8px] font-black text-slate-400 uppercase">Compl.</span>
-                                                                        </div>
+                                                                {activePaymentTab !== 'EFECTIVO' && (
+                                                                    <div className="space-y-1 flex-1 min-w-[140px]">
+                                                                        <label className="text-[9px] font-black text-slate-400 uppercase block">N° Operación</label>
+                                                                        <input type="text" value={p.reference} onChange={e => handleUpdatePayment(p.id, { reference: e.target.value })} placeholder="Referencia..." className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:border-indigo-300 outline-none" />
+                                                                    </div>
+                                                                )}
+                                                                <div className="space-y-1">
+                                                                    <label className="text-[9px] font-black text-slate-400 uppercase block">Monto</label>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <label className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2 py-1.5 cursor-pointer" title="Todo el total">
+                                                                            <input type="checkbox" checked={p.isComplete} onChange={e => handleUpdatePayment(p.id, { isComplete: e.target.checked })} className="w-3.5 h-3.5 rounded text-indigo-600" />
+                                                                            <span className="text-[8px] font-black text-slate-400 uppercase">Todo</span>
+                                                                        </label>
                                                                         <input
                                                                             type="number"
                                                                             value={p.amount}
+                                                                            disabled={p.isComplete}
                                                                             onChange={e => handleUpdatePayment(p.id, { amount: e.target.value })}
-                                                                            className="w-20 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 text-center focus:bg-white outline-none transition-all"
+                                                                            className={cn(
+                                                                                'w-28 border rounded-xl px-3 py-2 text-sm font-black text-center outline-none transition-all',
+                                                                                p.isComplete ? 'bg-indigo-50 border-indigo-200 text-indigo-700 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-800 focus:border-indigo-300'
+                                                                            )}
                                                                         />
                                                                     </div>
-                                                                </td>
-                                                                {activePaymentTab === 'EFECTIVO' && (
-                                                                    <td className="px-4 py-3 text-center">
-                                                                        <span className="text-sm font-black text-slate-900">S/ {p.change.toFixed(2)}</span>
-                                                                    </td>
-                                                                )}
-                                                                <td className="px-4 py-3 text-center">
-                                                                    <div className="flex justify-center gap-2">
-                                                                        <button
-                                                                            onClick={() => handleRemovePaymentRow(p.id)}
-                                                                            className="p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-colors"
-                                                                        >
-                                                                            <Trash2 size={16} />
-                                                                        </button>
-                                                                        <button
-                                                                            disabled={isPaymentReached}
-                                                                            onClick={() => handleAddPaymentRow(p.method)}
-                                                                            className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 transition-colors disabled:opacity-30"
-                                                                        >
-                                                                            <Plus size={16} />
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                        <tr className="bg-slate-50/30">
-                                                            <td colSpan={activePaymentTab === 'TARJETA' ? 4 : activePaymentTab === 'APLICATIVO' ? 3 : 1} className="px-4 py-4 text-[10px] font-black text-slate-900 uppercase">Totales</td>
-                                                            <td colSpan={3} className="px-4 py-4 text-right pr-12">
-                                                                <span className="text-sm font-black text-slate-900 uppercase pr-8">S/ {billingForm.payments.filter(p => p.method === (activePaymentTab === 'EFECTIVO' ? 'CASH' : activePaymentTab === 'TARJETA' ? 'CARD' : activePaymentTab === 'ABONO EN CUENTA' ? 'TRANSFER' : 'APP')).reduce((acc, p) => acc + parseFloat(p.amount || 0), 0).toFixed(2)}</span>
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <button onClick={() => handleRemovePaymentRow(p.id)} className="p-2 bg-red-50 text-red-400 rounded-xl hover:bg-red-100 transition-colors"><Trash2 size={14} /></button>
+                                                                    <button disabled={isPaymentReached} onClick={() => handleAddPaymentRow(p.method)} className="p-2 bg-white border border-slate-200 text-slate-400 rounded-xl hover:bg-slate-100 transition-colors disabled:opacity-30"><Plus size={14} /></button>
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    }
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
 
-                                            {isPaymentReached && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    className="p-4 bg-indigo-50 border border-indigo-100 rounded-[24px] flex items-center justify-center"
-                                                >
-                                                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">
-                                                        Haz alcanzado el pago correcto, no puedes agregar más tarjetas o mas metodos de pago.
-                                                    </span>
-                                                </motion.div>
-                                            )}
+                                    {billingForm.payments.some(p => parseFloat(p.amount) > 0) && (
+                                        <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                                            {[
+                                                { label: 'Efectivo (S/)', method: 'CASH', currency: 'SOLES', symbol: 'S/' },
+                                                { label: 'Efectivo ($)', method: 'CASH', currency: 'DOLARES', symbol: '$' },
+                                                { label: 'Tarjeta (S/)', method: 'CARD', currency: 'SOLES', symbol: 'S/' },
+                                                { label: 'Tarjeta ($)', method: 'CARD', currency: 'DOLARES', symbol: '$' },
+                                                { label: 'Transferencia (S/)', method: 'TRANSFER', currency: 'SOLES', symbol: 'S/' },
+                                                { label: 'Transferencia ($)', method: 'TRANSFER', currency: 'DOLARES', symbol: '$' },
+                                                { label: 'App (Yape/Plin)', method: 'APP', currency: 'SOLES', symbol: 'S/' },
+                                            ].filter(item => {
+                                                const amount = billingForm.payments.filter(p => p.method === item.method && p.currency === item.currency).reduce((acc, p) => acc + parseFloat(p.amount || 0), 0);
+                                                return amount > 0;
+                                            }).map(item => {
+                                                const amount = billingForm.payments.filter(p => p.method === item.method && p.currency === item.currency).reduce((acc, p) => acc + parseFloat(p.amount || 0), 0);
+                                                return (
+                                                    <div key={item.label} className="flex items-center justify-between px-5 py-2.5 border-b border-slate-100 last:border-0 bg-white">
+                                                        <span className="text-[12px] font-bold text-slate-600">{item.label}</span>
+                                                        <span className="text-[12px] font-black text-indigo-700 tabular-nums">{item.symbol} {amount.toFixed(2)}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                            <div className={cn('flex items-center justify-between px-5 py-3', isPaymentReached ? 'bg-green-50' : 'bg-amber-50')}>
+                                                <div>
+                                                    <p className={cn('text-[10px] font-black uppercase tracking-widest', isPaymentReached ? 'text-green-600' : 'text-amber-600')}>
+                                                        {isPaymentReached ? '✓ Pago completo' : 'Saldo pendiente'}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400 font-medium">Total: S/ {billingForm.total.toFixed(2)}</p>
+                                                </div>
+                                                <span className={cn('text-2xl font-black tabular-nums', isPaymentReached ? 'text-green-700' : 'text-amber-600')}>
+                                                    S/ {Math.abs(billingForm.total - totalPaid).toFixed(2)}
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Modal Footer */}
-                            <div className="p-8 border-t border-slate-200 bg-slate-50/80 flex gap-4">
-                                <button
-                                    onClick={handleConfirmInvoice}
-                                    disabled={!isPaymentReached}
-                                    className="flex-1 py-5 bg-blue-500 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 disabled:grayscale"
-                                >
-                                    <DollarSign size={18} /> Pagar
-                                </button>
-                                <button
-                                    onClick={() => setShowBillingModal(false)}
-                                    className="px-12 py-5 bg-white border border-slate-900 text-slate-900 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
-                                >
-                                    Cerrar
-                                </button>
+                            {/* Footer */}
+                            <div className="px-7 py-5 border-t border-slate-100 bg-slate-50/80">
+                                {invoiceError && (
+                                    <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5">
+                                        <AlertCircle size={15} className="text-red-500 mt-0.5 shrink-0" />
+                                        <p className="text-[11px] font-bold text-red-700 leading-snug">{invoiceError}</p>
+                                    </div>
+                                )}
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={handleConfirmInvoice}
+                                        disabled={!isPaymentReached || invoiceLoading}
+                                        className="flex-1 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                                    >
+                                        {invoiceLoading ? (
+                                            <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Procesando...</>
+                                        ) : isPaymentReached ? (
+                                            <><DollarSign size={16} /> Emitir {billingForm.type === 'FACTURA' ? 'Factura' : 'Boleta'}</>
+                                        ) : (
+                                            <>Faltan S/ {(billingForm.total - totalPaid).toFixed(2)} por registrar</>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setShowBillingModal(false)}
+                                        className="px-6 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
+                                    >Cerrar</button>
+                                </div>
                             </div>
                         </motion.div>
                     </motion.div>

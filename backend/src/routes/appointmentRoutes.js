@@ -5,6 +5,9 @@ const authMiddleware = require('../middlewares/authMiddleware');
 
 router.use(authMiddleware);
 
+router.get('/doctors', appointmentController.getDoctorsByBranch);
+router.get('/slots', appointmentController.getAvailableSlots);
+router.get('/available-days', appointmentController.getAvailableDays);
 router.get('/', appointmentController.getAppointments);
 router.post('/', appointmentController.createAppointment);
 router.put('/:id/attend', appointmentController.attendAppointment);

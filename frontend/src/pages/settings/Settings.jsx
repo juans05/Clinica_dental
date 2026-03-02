@@ -17,6 +17,7 @@ import {
     Loader2
 } from 'lucide-react';
 import api from '../../services/api';
+import UsersView from './UsersView';
 
 const Settings = () => {
     const [activeTab, setActiveTab] = useState('PROFILE');
@@ -104,7 +105,6 @@ const Settings = () => {
                             { id: 'PROFILE', icon: User, label: 'Mi perfil' },
                             { id: 'USERS', icon: Shield, label: 'Usuarios' },
                             { id: 'SUBSCRIPTION', icon: CreditCard, label: 'Suscripción' },
-                            { id: 'HISTORY', icon: Clock, label: 'Historia clínica' },
                             { id: 'ADMIN', icon: SettingsIcon, label: 'Administración' },
                             { id: 'INTEGRATIONS', icon: Zap, label: 'Integraciones' },
                         ].map((item) => (
@@ -261,7 +261,11 @@ const Settings = () => {
                         </div>
                     )}
 
-                    {activeTab !== 'PROFILE' && (
+                    {activeTab === 'USERS' && (
+                        <UsersView />
+                    )}
+
+                    {['SUBSCRIPTION', 'ADMIN', 'INTEGRATIONS'].includes(activeTab) && (
                         <div className="h-96 glass-card rounded-[40px] flex flex-center flex-col items-center justify-center space-y-4 text-slate-400 border border-dashed border-slate-200">
                             <Zap size={48} className="opacity-20 animate-pulse text-cyan-400" />
                             <div className="text-center">

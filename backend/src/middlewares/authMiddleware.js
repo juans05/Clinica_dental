@@ -48,16 +48,40 @@ module.exports = async (req, res, next) => {
             return res.status(401).json({ message: 'Sesión inválida o corrupta. Por favor, inicie sesión nuevamente.' });
         }
 
+        // Cargar usuario con su perfil y permisos reales desde la DB
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                profile: {
+                    include: {
+                        permissions: {
+                            include: {
+                                permission: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!user || !user.active) {
+            return res.status(401).json({ message: 'Usuario no encontrado o inactivo' });
+        }
+
         req.user = {
             id: userId,
             userId: userId,
-            role: decodedToken.role,
-            email: decodedToken.email,
-            companyId: parseInt(companyId),
-            branchId: branchId ? parseInt(branchId) : null
+            role: user.role, // Mantenemos el role enum por compatibilidad
+            email: user.email,
+            companyId: user.companyId,
+            branchId: user.branchId,
+            profile: user.profile?.name || null,
+            permissions: user.profile?.permissions.map(pp => pp.permission.key) || []
         };
+
         next();
     } catch (error) {
+        console.error('[AuthMiddleware] Error:', error);
         return res.status(401).json({ message: 'Token inválido o expirado' });
     }
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Stethoscope,
@@ -177,8 +177,16 @@ const Login = () => {
                         </button>
                     </form>
 
+                    {/* Registro */}
+                    <p className="mt-6 text-center text-sm text-slate-500 font-medium">
+                        ¿No tienes cuenta?{' '}
+                        <Link to="/register" className="text-cyan-600 font-black hover:text-cyan-700 transition-colors">
+                            Registra tu clínica gratis
+                        </Link>
+                    </p>
+
                     {/* Demo Credentials */}
-                    <div className="mt-8 p-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                    <div className="mt-4 p-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-between">
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Entorno de Desarrollo</div>
                         <button
                             onClick={() => { setEmail('admin@dental.com'); setPassword('admin123'); }}

@@ -9,7 +9,9 @@ import {
     CheckCircle,
     XCircle,
     Search,
-    AlertCircle
+    AlertCircle,
+    Ban,
+    Trash2
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -36,6 +38,14 @@ const Agenda = () => {
     const [consultories, setConsultories] = useState([]);
     const [searchPatient, setSearchPatient] = useState('');
     const [showPatientResults, setShowPatientResults] = useState(false);
+
+    // ── Bloqueo de horarios ──────────────────────────────────────────────────
+    const [showBlockModal, setShowBlockModal] = useState(false);
+    const [blockedSlots, setBlockedSlots] = useState([]);
+    const [blockForm, setBlockForm] = useState({
+        doctorId: '', date: '', startTime: '08:00', endTime: '09:00', reason: ''
+    });
+    const [blockSaving, setBlockSaving] = useState(false);
 
     const initialFormState = {
         date: '',
@@ -203,6 +213,44 @@ const Agenda = () => {
         }
     };
 
+    const fetchBlockedSlots = async (branchId) => {
+        if (!branchId) return;
+        try {
+            const res = await api.get(`schedule/blocked?branchId=${branchId}`);
+            setBlockedSlots(res.data);
+        } catch (e) { console.error('Error fetching blocked slots:', e); }
+    };
+
+    const handleCreateBlock = async (e) => {
+        e.preventDefault();
+        if (!selectedBranch) return alert('Selecciona una sede primero');
+        setBlockSaving(true);
+        try {
+            const startAt = new Date(`${blockForm.date}T${blockForm.startTime}`).toISOString();
+            const endAt   = new Date(`${blockForm.date}T${blockForm.endTime}`).toISOString();
+            await api.post('schedule/blocked', {
+                doctorId:  blockForm.doctorId || null,
+                branchId:  selectedBranch,
+                startAt, endAt,
+                reason: blockForm.reason || null
+            });
+            setBlockForm({ doctorId: '', date: '', startTime: '08:00', endTime: '09:00', reason: '' });
+            fetchBlockedSlots(selectedBranch);
+        } catch (err) {
+            alert('Error: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setBlockSaving(false);
+        }
+    };
+
+    const handleDeleteBlock = async (id) => {
+        if (!window.confirm('¿Eliminar este bloqueo?')) return;
+        try {
+            await api.delete(`schedule/blocked/${id}`);
+            setBlockedSlots(s => s.filter(b => b.id !== id));
+        } catch (e) { alert('Error al eliminar bloqueo'); }
+    };
+
     const filteredPatients = patients.filter(p =>
         (p.firstName?.toLowerCase().includes(searchPatient.toLowerCase()) || false) ||
         (p.paternalSurname?.toLowerCase().includes(searchPatient.toLowerCase()) || false) ||
@@ -247,15 +295,26 @@ const Agenda = () => {
                     <h1 className="text-3xl md:text-5xl font-black text-slate-800 tracking-tight">Citas Programadas</h1>
                 </div>
 
-                <button
-                    onClick={() => {
-                        setFormData({ ...initialFormState, date: viewDate.toISOString().split('T')[0] });
-                        setShowModal(true);
-                    }}
-                    className="premium-button-primary w-full md:w-auto"
-                >
-                    <Plus size={20} /> Nueva Cita
-                </button>
+                <div className="flex gap-3 w-full md:w-auto">
+                    <button
+                        onClick={() => {
+                            fetchBlockedSlots(selectedBranch);
+                            setShowBlockModal(true);
+                        }}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-all shadow-sm"
+                    >
+                        <Ban size={18} /> Bloquear Horario
+                    </button>
+                    <button
+                        onClick={() => {
+                            setFormData({ ...initialFormState, date: viewDate.toISOString().split('T')[0] });
+                            setShowModal(true);
+                        }}
+                        className="flex-1 md:flex-none premium-button-primary"
+                    >
+                        <Plus size={20} /> Nueva Cita
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -741,6 +800,116 @@ const Agenda = () => {
                     </div >
                 )}
             </AnimatePresence >
+
+            {/* ── Modal: Bloquear Horario ──────────────────────────────── */}
+            <AnimatePresence>
+                {showBlockModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            onClick={() => setShowBlockModal(false)}
+                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                            className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg relative z-10 overflow-hidden border border-white/20"
+                        >
+                            <div className="p-8 border-b border-slate-100 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center">
+                                        <Ban size={20} />
+                                    </div>
+                                    <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Bloquear Horario</h2>
+                                </div>
+                                <button onClick={() => setShowBlockModal(false)} className="text-slate-400 hover:text-rose-500 transition-colors">
+                                    <XCircle size={24} />
+                                </button>
+                            </div>
+
+                            <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                                {/* Formulario */}
+                                <form onSubmit={handleCreateBlock} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Médico (opcional — vacío = bloquear toda la sede)</label>
+                                        <select
+                                            value={blockForm.doctorId}
+                                            onChange={e => setBlockForm(f => ({ ...f, doctorId: e.target.value }))}
+                                            className="premium-input bg-slate-50"
+                                        >
+                                            <option value="">Todos los médicos de la sede</option>
+                                            {doctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fecha</label>
+                                        <input
+                                            type="date" required
+                                            value={blockForm.date}
+                                            onChange={e => setBlockForm(f => ({ ...f, date: e.target.value }))}
+                                            className="premium-input bg-slate-50"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Desde</label>
+                                            <input type="time" required value={blockForm.startTime}
+                                                onChange={e => setBlockForm(f => ({ ...f, startTime: e.target.value }))}
+                                                className="premium-input bg-slate-50" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hasta</label>
+                                            <input type="time" required value={blockForm.endTime}
+                                                onChange={e => setBlockForm(f => ({ ...f, endTime: e.target.value }))}
+                                                className="premium-input bg-slate-50" />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Motivo</label>
+                                        <input type="text" placeholder="Ej: Reunión, Vacaciones, Mantenimiento..."
+                                            value={blockForm.reason}
+                                            onChange={e => setBlockForm(f => ({ ...f, reason: e.target.value }))}
+                                            className="premium-input bg-slate-50" />
+                                    </div>
+
+                                    <button type="submit" disabled={blockSaving}
+                                        className="w-full py-4 bg-rose-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 active:scale-[0.98] transition-all disabled:opacity-60">
+                                        <Ban size={16} /> {blockSaving ? 'Guardando...' : 'Registrar Bloqueo'}
+                                    </button>
+                                </form>
+
+                                {/* Lista de bloqueos activos */}
+                                {blockedSlots.length > 0 && (
+                                    <div className="space-y-3">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bloqueos registrados</p>
+                                        {blockedSlots.map(b => (
+                                            <div key={b.id} className="flex items-center justify-between p-3 bg-rose-50 rounded-2xl border border-rose-100">
+                                                <div className="text-xs space-y-0.5">
+                                                    <p className="font-black text-rose-700">
+                                                        {b.doctor ? b.doctor.name : 'Toda la sede'}
+                                                    </p>
+                                                    <p className="text-rose-500 font-medium">
+                                                        {new Date(b.startAt).toLocaleDateString('es-PE')} · {new Date(b.startAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })} — {new Date(b.endAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                    {b.reason && <p className="text-rose-400 italic">{b.reason}</p>}
+                                                </div>
+                                                <button onClick={() => handleDeleteBlock(b.id)}
+                                                    className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-100 rounded-xl transition-colors">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div >
     );
 };

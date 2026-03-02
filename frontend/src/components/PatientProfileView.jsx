@@ -15,7 +15,10 @@ import QuestionnaireView from './QuestionnaireView';
 import BudgetModule from './BudgetModule';
 import FilesModule from './FilesModule';
 import ConsentModule from './ConsentModule';
+import AccountStatementModule from './AccountStatementModule';
 import usePatientStore from '../store/usePatientStore';
+import QuickAppointmentModal from './QuickAppointmentModal';
+import { useAuth } from '../context/AuthContext';
 
 const cn = (...inputs) => twMerge(clsx(inputs));
 
@@ -38,6 +41,19 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
     const activeModule = urlModule || propInitialModule || 'filiation';
     const onBack = propOnBack || (() => navigate('/patients'));
 
+    const { hasPermission } = useAuth();
+
+    const MENU_ITEMS = [
+        { id: 'filiation', label: 'Filiación', icon: User, perm: 'patients:view' },
+        { id: 'history', label: 'Historia clínica', icon: FileText, perm: 'history:view' },
+        { id: 'odontogram', label: 'Odontograma', icon: Activity, perm: 'history:view' },
+        { id: 'budgets', label: 'Presupuestos', icon: DollarSign, perm: 'finance:view' },
+        { id: 'account', label: 'Estado de cuenta', icon: CreditCard, perm: 'finance:view' },
+        { id: 'prescriptions', label: 'Prescripciones', icon: ClipboardList, perm: 'history:view' },
+        { id: 'consents', label: 'Consentimientos', icon: Shield, perm: 'patients:view' },
+        { id: 'files', label: 'Archivos', icon: FileText, perm: 'patients:view' },
+    ].filter(item => hasPermission(item.perm));
+
     useEffect(() => {
         fetchPatient(patientId);
     }, [patientId, fetchPatient]);
@@ -46,12 +62,21 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
         navigate(`/expediente/${patientId}/${mod}`);
     };
 
+    // Redirigir si el módulo actual no está permitido
+    useEffect(() => {
+        if (!MENU_ITEMS.find(m => m.id === activeModule)) {
+            setActiveModule('filiation');
+        }
+    }, [activeModule, hasPermission]);
+
     const {
         activeTab,
         setActiveTab,
         activeHistoryTab,
         setActiveHistoryTab
     } = usePatientStore();
+
+    const [showAppointmentModal, setShowAppointmentModal] = React.useState(false);
 
     const autoSelectRef = React.useRef(null);
 
@@ -117,22 +142,21 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
         </div>
     );
 
-    const MENU_ITEMS = [
-        { id: 'filiation', label: 'Filiación', icon: User },
-        { id: 'history', label: 'Historia clínica', icon: FileText },
-        { id: 'odontogram', label: 'Odontograma', icon: Activity },
-        { id: 'budgets', label: 'Presupuestos', icon: DollarSign },
-        // { id: 'periodontogram', label: 'Periodontograma', icon: Activity },
-        // { id: 'orthodontics', label: 'Ortodoncia', icon: Stethoscope },
-        { id: 'account', label: 'Estado de cuenta', icon: CreditCard },
-        { id: 'prescriptions', label: 'Prescripciones', icon: ClipboardList },
-        { id: 'consents', label: 'Consentimientos', icon: Shield },
-        { id: 'files', label: 'Archivos', icon: FileText },
-    ];
+
 
 
     return (
         <div className="w-full h-full flex gap-4 text-slate-700 relative">
+
+            {/* Quick Appointment Modal */}
+            {showAppointmentModal && (
+                <QuickAppointmentModal
+                    patientId={patientId}
+                    patientName={`${patient.firstName} ${patient.paternalSurname}`}
+                    onClose={() => setShowAppointmentModal(false)}
+                    onSuccess={() => setShowAppointmentModal(false)}
+                />
+            )}
 
             {/* ── Sidebar ── */}
             <div className="w-72 flex flex-col gap-4 shrink-0">
@@ -159,10 +183,18 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
                         Creado el {new Date(patient.createdAt).toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
 
-                    <div className="flex items-center gap-2 mt-4">
-                        <button className="h-9 w-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><Edit3 size={16} /></button>
-                        <button className="h-9 w-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><Mail size={16} /></button>
-                        <button className="h-9 w-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><MoreHorizontal size={16} /></button>
+                    <div className="flex items-center gap-2 mt-4 flex-col w-full">
+                        <button
+                            onClick={() => setShowAppointmentModal(true)}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-indigo-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-cyan-500/20"
+                        >
+                            <Calendar size={14} /> Generar Cita
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <button className="h-9 w-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><Edit3 size={16} /></button>
+                            <button className="h-9 w-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><Mail size={16} /></button>
+                            <button className="h-9 w-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><MoreHorizontal size={16} /></button>
+                        </div>
                     </div>
                 </div>
 
@@ -492,7 +524,10 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
 
                     {activeModule === 'consents' && (
                         <div className="h-full overflow-y-auto p-8">
-                            <ConsentModule patientId={patientId} />
+                            <ConsentModule
+                                patientId={patientId}
+                                patientName={`${patient?.firstName || ''} ${patient?.paternalSurname || ''}`.trim()}
+                            />
                         </div>
                     )}
 
@@ -546,12 +581,19 @@ const PatientProfileView = ({ patientId: propId, onBack: propOnBack, initialModu
                     )}
 
 
+                    {activeModule === 'account' && (
+                        <div className="h-full overflow-y-auto p-8">
+                            <AccountStatementModule patientId={patientId} />
+                        </div>
+                    )}
+
                     {(activeModule !== 'filiation' &&
                         activeModule !== 'odontogram' &&
                         activeModule !== 'history' &&
                         activeModule !== 'budgets' &&
                         activeModule !== 'consents' &&
-                        activeModule !== 'files') && (
+                        activeModule !== 'files' &&
+                        activeModule !== 'account') && (
                             <div className="flex-1 flex flex-col items-center justify-center p-20 text-center grayscale opacity-30">
                                 <div className="h-32 w-32 rounded-full border-4 border-dashed border-slate-300 flex items-center justify-center mb-6">
                                     <ClipboardList size={48} className="text-slate-400" />

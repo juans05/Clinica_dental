@@ -73,6 +73,10 @@ const useOdontogramStore = create((set, get) => ({
     toothHistory: [],
     globalSpecifications: '',
     globalObservations: '',
+    // Multi-visit support
+    allVisits: [],          // all Odontogram records (sorted newest first)
+    currentVisitId: null,   // id of the visit being viewed/edited
+    isReadOnlyVisit: false, // true when viewing a past (not the latest) visit
 
     // Actions
     setIsTemporary: (isTemp) => set({ isTemporary: isTemp }),
@@ -82,6 +86,68 @@ const useOdontogramStore = create((set, get) => ({
     setActiveMode: (mode) => set({ activeMode: mode }),
     setGlobalSpecifications: (val) => set({ globalSpecifications: val, dirty: true }),
     setGlobalObservations: (val) => set({ globalObservations: val, dirty: true }),
+
+    // Switch to a specific visit for viewing (read-only if not the latest)
+    switchVisit: (visitId) => {
+        const { allVisits } = get();
+        const visit = allVisits.find(v => v.id === visitId);
+        if (!visit) return;
+        const isLatest = allVisits.length > 0 && allVisits[0].id === visitId;
+        const mergedTeeth = buildState();
+        const backendData = visit.data || {};
+        Object.keys(backendData).forEach(n => {
+            if (mergedTeeth[n]) {
+                const raw = backendData[n];
+                if (!raw) return;
+                const normConditions = (Array.isArray(raw.conditions) ? raw.conditions : [])
+                    .filter(c => typeof c === 'string' && c !== 'HEALTHY');
+                if (raw.condition && typeof raw.condition === 'string' && raw.condition !== 'HEALTHY' && !normConditions.includes(raw.condition)) {
+                    normConditions.push(raw.condition);
+                }
+                const normSurfaces = {};
+                ['O', 'V', 'L', 'M', 'D'].forEach(s => {
+                    const val = raw?.surfaces ? raw.surfaces[s] : null;
+                    normSurfaces[s] = (Array.isArray(val) ? val : []).filter(c => typeof c === 'string' && c !== 'HEALTHY');
+                    if (typeof val === 'string' && val !== 'HEALTHY' && !normSurfaces[s].includes(val)) normSurfaces[s].push(val);
+                });
+                mergedTeeth[n] = { ...mergedTeeth[n], conditions: normConditions, surfaces: normSurfaces, notes: raw?.notes || '', evolutionState: raw?.evolutionState || null };
+            }
+        });
+        set({
+            teeth: mergedTeeth,
+            globalSpecifications: backendData.globalSpecifications || '',
+            globalObservations: backendData.globalObservations || '',
+            currentVisitId: visitId,
+            isReadOnlyVisit: !isLatest,
+            dirty: false,
+            pendingLogs: [],
+        });
+    },
+
+    // Create a brand new visit for this patient
+    createNewVisit: async (patientId, sessionNotes = '') => {
+        set({ saving: true });
+        try {
+            const r = await api.post(`odontograms/${patientId}/new`, { sessionNotes });
+            const newVisit = r.data;
+            set(state => ({
+                allVisits: [newVisit, ...state.allVisits],
+                currentVisitId: newVisit.id,
+                isReadOnlyVisit: false,
+                teeth: buildState(),
+                globalSpecifications: '',
+                globalObservations: '',
+                dirty: false,
+                pendingLogs: [],
+                saving: false,
+            }));
+            return newVisit;
+        } catch (e) {
+            console.error('Error creating new visit:', e);
+            set({ saving: false });
+            return null;
+        }
+    },
 
     setEvolutionState: (n, state) => set((stateStore) => {
         const teeth = { ...stateStore.teeth };
@@ -97,64 +163,47 @@ const useOdontogramStore = create((set, get) => ({
         set({ loading: true });
         try {
             const r = await api.get(`odontograms/${patientId}`);
-            const backendData = r.data?.data;
+            const { all, current } = r.data || {};
+            const allVisits = Array.isArray(all) ? all : (current ? [current] : []);
+            const backendData = current?.data;
 
-            if (backendData) {
+            const mergeData = (data) => {
                 const mergedTeeth = buildState();
-                Object.keys(backendData).forEach(n => {
+                if (!data) return mergedTeeth;
+                Object.keys(data).forEach(n => {
                     if (mergedTeeth[n]) {
-                        const raw = backendData[n];
+                        const raw = data[n];
                         if (!raw) return;
-
-                        // Normalización: Convertir strings antiguos a arreglos nuevos
                         const normConditions = (Array.isArray(raw.conditions) ? raw.conditions : [])
                             .filter(c => typeof c === 'string' && c !== 'HEALTHY');
-
-                        // Si venía de una versión muy antigua con condition única
                         if (raw.condition && typeof raw.condition === 'string' && raw.condition !== 'HEALTHY' && !normConditions.includes(raw.condition)) {
                             normConditions.push(raw.condition);
                         }
-
                         const normSurfaces = {};
                         ['O', 'V', 'L', 'M', 'D'].forEach(s => {
                             const val = raw?.surfaces ? raw.surfaces[s] : null;
-                            normSurfaces[s] = (Array.isArray(val) ? val : [])
-                                .filter(c => typeof c === 'string' && c !== 'HEALTHY');
-
-                            // Retrocompatibilidad con strings simples
-                            if (typeof val === 'string' && val !== 'HEALTHY' && !normSurfaces[s].includes(val)) {
-                                normSurfaces[s].push(val);
-                            }
+                            normSurfaces[s] = (Array.isArray(val) ? val : []).filter(c => typeof c === 'string' && c !== 'HEALTHY');
+                            if (typeof val === 'string' && val !== 'HEALTHY' && !normSurfaces[s].includes(val)) normSurfaces[s].push(val);
                         });
-
-                        mergedTeeth[n] = {
-                            ...mergedTeeth[n],
-                            conditions: normConditions,
-                            surfaces: normSurfaces,
-                            notes: raw?.notes || '',
-                            evolutionState: raw?.evolutionState || null // Normalizar evolución
-                        };
+                        mergedTeeth[n] = { ...mergedTeeth[n], conditions: normConditions, surfaces: normSurfaces, notes: raw?.notes || '', evolutionState: raw?.evolutionState || null };
                     }
                 });
-                set({
-                    teeth: mergedTeeth,
-                    globalSpecifications: backendData.globalSpecifications || '',
-                    globalObservations: backendData.globalObservations || '',
-                    loading: false,
-                    dirty: false
-                });
-            } else {
-                set({
-                    teeth: buildState(),
-                    globalSpecifications: '',
-                    globalObservations: '',
-                    loading: false,
-                    dirty: false
-                });
-            }
+                return mergedTeeth;
+            };
+
+            set({
+                teeth: mergeData(backendData),
+                globalSpecifications: backendData?.globalSpecifications || '',
+                globalObservations: backendData?.globalObservations || '',
+                allVisits,
+                currentVisitId: current?.id || null,
+                isReadOnlyVisit: false,
+                loading: false,
+                dirty: false
+            });
         } catch (e) {
             console.error('Error fetching odontogram:', e);
-            set({ teeth: buildState(), loading: false, dirty: false });
+            set({ teeth: buildState(), allVisits: [], loading: false, dirty: false });
         }
     },
 
@@ -317,14 +366,15 @@ const useOdontogramStore = create((set, get) => ({
     }),
 
     saveOdontogram: async (patientId) => {
-        const { teeth, pendingLogs, globalSpecifications, globalObservations } = get();
+        const { teeth, pendingLogs, globalSpecifications, globalObservations, currentVisitId } = get();
         set({ saving: true });
         try {
             await api.put(`odontograms/${patientId}`, {
                 data: teeth,
                 logs: pendingLogs,
                 globalSpecifications,
-                globalObservations
+                globalObservations,
+                odontogramId: currentVisitId, // send which visit to update
             });
             set({ saving: false, dirty: false, pendingLogs: [] });
         } catch (e) {

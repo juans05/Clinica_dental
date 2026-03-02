@@ -14,6 +14,8 @@ const billingRoutes = require('./billingRoutes');
 const consultoryRoutes = require('./consultoryRoutes');
 const consentRoutes = require('./consentRoutes');
 const patientFileRoutes = require('./patientFileRoutes');
+const dashboardRoutes = require('./dashboardRoutes');
+const scheduleRoutes  = require('./scheduleRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/patients', patientRoutes);
@@ -28,5 +30,7 @@ router.use('/billing', billingRoutes);
 router.use('/consultories', consultoryRoutes);
 router.use('/consents', consentRoutes);
 router.use('/patient-files', patientFileRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/schedule',  scheduleRoutes);
 
 module.exports = router;

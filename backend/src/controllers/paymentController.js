@@ -3,7 +3,9 @@ const prisma = require('../utils/prisma');
 const createPayment = async (req, res) => {
     try {
         const { companyId } = req.user;
-        const { amount, method, reference, treatmentPlanId, appointmentId } = req.body;
+        const { amount, method, reference, treatmentPlanId, appointmentId, branchId } = req.body;
+        const createdBy = req.user.id;
+        const finalBranchId = branchId ? parseInt(branchId) : (req.user.branchId || null);
 
         if (!amount) {
             return res.status(400).json({ message: 'El monto es requerido' });
@@ -16,7 +18,9 @@ const createPayment = async (req, res) => {
                 reference,
                 treatmentPlanId: treatmentPlanId ? parseInt(treatmentPlanId) : null,
                 appointmentId: appointmentId ? parseInt(appointmentId) : null,
-                companyId: parseInt(companyId)
+                companyId: parseInt(companyId),
+                branchId: finalBranchId,
+                createdBy: parseInt(createdBy)
             }
         });
 

@@ -2,12 +2,22 @@ const prisma = require('../utils/prisma');
 
 const getPatients = async (req, res) => {
     try {
-        const { companyId } = req.user;
+        const { id: userId, companyId, role } = req.user;
+        const { documentId } = req.query;
+
+        const where = { companyId, active: true };
+        if (documentId) where.documentId = documentId;
+
+        // Si es médico (DENTIST), solo ve sus pacientes (que tengan citas o planes con él)
+        if (role === 'DENTIST') {
+            where.OR = [
+                { appointments: { some: { doctorId: userId } } },
+                { treatmentPlans: { some: { doctorId: userId } } }
+            ];
+        }
+
         const patients = await prisma.patient.findMany({
-            where: {
-                companyId,
-                active: true // Only show active patients by default
-            },
+            where,
             include: {
                 appointments: {
                     orderBy: { date: 'desc' },
@@ -25,13 +35,24 @@ const getPatients = async (req, res) => {
 const getPatientById = async (req, res) => {
     try {
         const { id } = req.params;
-        const { companyId } = req.user;
+        const { id: userId, companyId, role } = req.user;
+
+        const where = {
+            id: parseInt(id),
+            companyId,
+            active: true
+        };
+
+        // Si es médico (DENTIST), validar que el paciente sea suyo
+        if (role === 'DENTIST') {
+            where.OR = [
+                { appointments: { some: { doctorId: userId } } },
+                { treatmentPlans: { some: { doctorId: userId } } }
+            ];
+        }
+
         const patient = await prisma.patient.findFirst({
-            where: {
-                id: parseInt(id),
-                companyId,
-                active: true
-            },
+            where,
             include: {
                 appointments: true,
                 odontograms: true
@@ -39,7 +60,7 @@ const getPatientById = async (req, res) => {
         });
 
         if (!patient) {
-            return res.status(404).json({ message: 'Paciente no encontrado' });
+            return res.status(404).json({ message: 'Paciente no encontrado o acceso denegado' });
         }
         res.json(patient);
     } catch (error) {

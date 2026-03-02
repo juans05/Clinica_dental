@@ -26,7 +26,7 @@ const getTreatmentPlans = async (req, res) => {
                     orderBy: { createdAt: 'asc' },
                 },
                 payments: true,
-                invoices: true,
+                branch: true,
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -51,7 +51,7 @@ const getTreatmentPlanById = async (req, res) => {
                     orderBy: { createdAt: 'asc' },
                 },
                 payments: true,
-                invoices: true,
+                branch: true,
             },
         });
         if (!plan) return res.status(404).json({ message: 'Plan de tratamiento no encontrado' });
@@ -70,10 +70,24 @@ const createTreatmentPlan = async (req, res) => {
             return res.status(400).json({ message: 'Campos requeridos: patientId, doctorId' });
         }
 
+        const companyId = parseInt(req.user.companyId);
+        const branchId = req.user.branchId ? parseInt(req.user.branchId) : null;
+
+        // Número secuencial por empresa: MAX(number) + 1
+        // Usamos MAX en lugar de COUNT para tolerar eliminaciones sin romper la secuencia.
+        const aggregate = await prisma.treatmentPlan.aggregate({
+            where: { companyId },
+            _max: { number: true },
+        });
+        const nextNumber = (aggregate._max.number ?? 0) + 1;
+
         const plan = await prisma.treatmentPlan.create({
             data: {
                 patientId: parseInt(patientId),
                 doctorId: parseInt(doctorId),
+                companyId,
+                branchId,
+                number: nextNumber,
                 name: name || null,
                 discount: parseFloat(discount) || 0,
                 notes: notes || null,

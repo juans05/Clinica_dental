@@ -16,18 +16,23 @@ const getCompany = async (req, res) => {
 const updateCompany = async (req, res) => {
     try {
         const companyId = parseInt(req.user.companyId);
-        const { commercialName, phone, address, receptionEmail, logo, website, description } = req.body;
+        const { name, commercialName, taxId, phone, address, receptionEmail, logo, website, description,
+                apisunatPersonaId, apisunatPersonaToken } = req.body;
 
         const company = await prisma.company.update({
             where: { id: companyId },
             data: {
-                commercialName,
-                phone,
-                address,
-                receptionEmail,
-                logo,
-                website,
-                description
+                ...(name               !== undefined && { name }),
+                ...(commercialName     !== undefined && { commercialName }),
+                ...(taxId              !== undefined && { taxId }),
+                ...(phone              !== undefined && { phone }),
+                ...(address            !== undefined && { address }),
+                ...(receptionEmail     !== undefined && { receptionEmail }),
+                ...(logo               !== undefined && { logo }),
+                ...(website            !== undefined && { website }),
+                ...(description        !== undefined && { description }),
+                ...(apisunatPersonaId  !== undefined && { apisunatPersonaId }),
+                ...(apisunatPersonaToken !== undefined && { apisunatPersonaToken }),
             }
         });
 

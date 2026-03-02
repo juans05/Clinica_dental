@@ -23,19 +23,20 @@ const cn = (...inputs) => {
 }
 
 const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
-    const { logout, user } = useAuth();
+    const { logout, user, hasPermission } = useAuth();
     const navigate = useNavigate();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
     const menuItems = [
-        { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-        { icon: Users, label: 'Pacientes', path: '/patients' },
-        { icon: Calendar, label: 'Agenda', path: '/agenda' },
-        { icon: FileText, label: 'Historias', path: '/history' },
-        { icon: Shield, label: 'Gestión', path: '/management' },
-        { icon: Stethoscope, label: 'Servicios', path: '/services' },
-        { icon: Settings, label: 'Configuración', path: '/settings' },
-    ];
+        { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', perm: 'dash:view' },
+        { icon: Users, label: 'Pacientes', path: '/patients', perm: 'patients:view' },
+        { icon: Calendar, label: 'Agenda', path: '/agenda', perm: 'agenda:view' },
+        { icon: FileText, label: 'Historias', path: '/history', perm: 'history:view' },
+        { icon: Shield, label: 'Finanzas', path: '/finance', perm: 'finance:view' },
+        { icon: Shield, label: 'Gestión', path: '/management', perm: 'settings:admin' },
+        { icon: Stethoscope, label: 'Servicios', path: '/services', perm: 'settings:view' },
+        { icon: Settings, label: 'Configuración', path: '/settings', perm: 'settings:view' },
+    ].filter(item => hasPermission(item.perm));
 
     const handleLogout = () => {
         logout();
@@ -128,11 +129,11 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                         <div className="px-3 py-4 mb-2 bg-slate-800/40 rounded-xl border border-slate-700/50">
                             <div className="flex items-center gap-3">
                                 <div className="h-8 w-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs uppercase">
-                                    {user?.firstName?.[0] || 'A'}
+                                    {user?.name?.[0] || 'A'}
                                 </div>
                                 <div className="overflow-hidden">
-                                    <p className="text-xs font-bold text-slate-200 truncate">{user?.firstName} {user?.lastName}</p>
-                                    <p className="text-[10px] text-slate-500 truncate">{user?.role || 'Administrador'}</p>
+                                    <p className="text-xs font-bold text-slate-200 truncate">{user?.name}</p>
+                                    <p className="text-[10px] text-slate-500 truncate">{user?.profile || user?.role || 'Administrador'}</p>
                                 </div>
                             </div>
                         </div>

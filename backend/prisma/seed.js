@@ -1,5 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { execSync } = require('child_process');
+const path = require('path');
 
 const prisma = new PrismaClient();
 
@@ -44,14 +46,15 @@ async function main() {
         },
     });
 
-    console.log('Seed completed successfully:', { company, branch, admin });
+    console.log('Seed base completado:', { company: company.name, branch: branch.name, admin: admin.email });
+
+    // 4. Seed del catálogo de servicios dentales
+    await prisma.$disconnect();
+    execSync(`node ${path.join(__dirname, 'seedServices.js')}`, { stdio: 'inherit' });
 }
 
 main()
     .catch((e) => {
         console.error(e);
         process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
     });

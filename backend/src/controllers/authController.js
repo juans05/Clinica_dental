@@ -2,9 +2,113 @@ const prisma = require('../utils/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// ── Registro público: crea empresa + usuario admin en una sola transacción ──
+const registerCompany = async (req, res) => {
+    try {
+        const { companyName, taxId, adminName, email, password } = req.body;
+
+        if (!companyName || !taxId || !adminName || !email || !password) {
+            return res.status(400).json({ message: 'Campos requeridos: companyName, taxId, adminName, email, password' });
+        }
+
+        const [existingTax, existingEmail] = await Promise.all([
+            prisma.company.findUnique({ where: { taxId } }),
+            prisma.user.findUnique({ where: { email } })
+        ]);
+        if (existingTax) return res.status(400).json({ message: 'Ya existe una empresa registrada con ese RUC' });
+        if (existingEmail) return res.status(400).json({ message: 'El correo ya está en uso' });
+
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        const { user } = await prisma.$transaction(async (tx) => {
+            const company = await tx.company.create({
+                data: { name: companyName, taxId }
+            });
+
+            // ── Crear perfiles por defecto para la nueva empresa ──
+            const allPermissions = await tx.permission.findMany();
+
+            // 1. Administrador (todo)
+            const adminProfile = await tx.profile.create({
+                data: {
+                    name: 'ADMINISTRADOR',
+                    description: 'Acceso total al sistema',
+                    companyId: company.id,
+                    permissions: {
+                        create: allPermissions.map(p => ({ permission: { connect: { id: p.id } } }))
+                    }
+                }
+            });
+
+            // 2. Odontólogo (clínica + agenda)
+            await tx.profile.create({
+                data: {
+                    name: 'ODONTÓLOGO',
+                    description: 'Gestión clínica y agenda',
+                    companyId: company.id,
+                    permissions: {
+                        create: allPermissions
+                            .filter(p => !p.key.includes('finance:admin') && !p.key.includes('settings:admin'))
+                            .map(p => ({ permission: { connect: { id: p.id } } }))
+                    }
+                }
+            });
+
+            // 3. Recepción (agenda + pacientes)
+            await tx.profile.create({
+                data: {
+                    name: 'RECEPCIÓN',
+                    description: 'Agenda y Pacientes básico',
+                    companyId: company.id,
+                    permissions: {
+                        create: allPermissions
+                            .filter(p => p.key.startsWith('patients') || p.key.startsWith('agenda') || p.key === 'dash:view')
+                            .map(p => ({ permission: { connect: { id: p.id } } }))
+                    }
+                }
+            });
+
+            const user = await tx.user.create({
+                data: {
+                    email,
+                    password: hashedPassword,
+                    name: adminName,
+                    role: 'ADMIN',
+                    companyId: company.id,
+                    profileId: adminProfile.id
+                }
+            });
+            return { user };
+        });
+
+        const token = jwt.sign(
+            { userId: user.id, role: user.role, email: user.email, companyId: user.companyId, branchId: null },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN }
+        );
+
+        res.status(201).json({
+            token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                companyId: user.companyId,
+                branchId: null,
+                needsSetup: true,
+                profile: 'ADMINISTRADOR'
+            }
+        });
+    } catch (error) {
+        console.error('Error en registerCompany:', error);
+        res.status(500).json({ message: 'Error en el servidor', detail: error.message });
+    }
+};
+
 const register = async (req, res) => {
     try {
-        const { email, password, name, role, branchId } = req.body;
+        const { email, password, name, role, branchId, profileId } = req.body;
         // companyId comes from the authenticated token (secure), fallback to body
         const companyId = req.user?.companyId || req.body.companyId;
 
@@ -19,6 +123,16 @@ const register = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 12);
 
+        // Buscar perfil por defecto si no se provee profileId
+        let finalProfileId = profileId ? parseInt(profileId) : null;
+        if (!finalProfileId) {
+            const profileName = role === 'ADMIN' ? 'ADMINISTRADOR' : (role === 'RECEPTIONIST' || role === 'ASSISTANT' ? 'RECEPCIÓN' : 'ODONTÓLOGO');
+            const defaultProfile = await prisma.profile.findFirst({
+                where: { name: profileName, companyId: parseInt(companyId) }
+            });
+            finalProfileId = defaultProfile?.id;
+        }
+
         const user = await prisma.user.create({
             data: {
                 email,
@@ -27,6 +141,7 @@ const register = async (req, res) => {
                 role: role || 'DENTIST',
                 companyId: parseInt(companyId),
                 branchId: branchId ? parseInt(branchId) : null,
+                profileId: finalProfileId
             },
         });
 
@@ -41,7 +156,21 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({
+            where: { email },
+            include: {
+                profile: {
+                    include: {
+                        permissions: {
+                            include: {
+                                permission: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
         if (!user) {
             return res.status(401).json({ message: 'Credenciales inválidas' });
         }
@@ -67,6 +196,12 @@ const login = async (req, res) => {
             { expiresIn: process.env.JWT_EXPIRES_IN }
         );
 
+        // Detectar si la empresa necesita configuración inicial
+        const branchCount = await prisma.branch.count({ where: { companyId: user.companyId } });
+        const needsSetup = branchCount === 0;
+
+        const permissions = user.profile?.permissions.map(pp => pp.permission.key) || [];
+
         res.json({
             token,
             user: {
@@ -76,6 +211,9 @@ const login = async (req, res) => {
                 role: user.role,
                 companyId: user.companyId,
                 branchId: user.branchId,
+                needsSetup,
+                profile: user.profile?.name || null,
+                permissions: permissions
             },
         });
     } catch (error) {
@@ -100,7 +238,14 @@ const getUsers = async (req, res) => {
                 name: true,
                 email: true,
                 role: true,
-                branchId: true
+                branchId: true,
+                profileId: true,
+                profile: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                }
             }
         });
 
@@ -115,21 +260,26 @@ const updateUser = async (req, res) => {
     try {
         const { companyId } = req.user;
         const { id } = req.params;
-        const { name, email, role, branchId, active } = req.body;
+        const updateData = {
+            name,
+            email,
+            role: role ? role : undefined,
+            branchId: branchId ? parseInt(branchId) : (branchId === null ? null : undefined),
+            profileId: profileId ? parseInt(profileId) : undefined,
+            active,
+            updatedAt: new Date()
+        };
+
+        if (req.body.password) {
+            updateData.password = await bcrypt.hash(req.body.password, 12);
+        }
 
         const user = await prisma.user.update({
             where: {
                 id: parseInt(id),
                 companyId // Security check
             },
-            data: {
-                name,
-                email,
-                role: role ? role : undefined,
-                branchId: branchId ? parseInt(branchId) : (branchId === null ? null : undefined),
-                active,
-                updatedAt: new Date()
-            }
+            data: updateData
         });
 
         res.json(user);
@@ -160,6 +310,7 @@ const deleteUser = async (req, res) => {
 };
 
 module.exports = {
+    registerCompany,
     register,
     login,
     getUsers,

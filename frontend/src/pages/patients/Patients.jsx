@@ -24,13 +24,14 @@ import {
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import PatientRegistrationModal from '../../components/PatientRegistrationModal';
+import QuickAppointmentModal from '../../components/QuickAppointmentModal';
 
 const cn = (...inputs) => {
     return twMerge(clsx(inputs));
 }
 
 const Patients = () => {
-    const { user } = useAuth();
+    const { user, hasPermission } = useAuth();
     const navigate = useNavigate();
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -39,6 +40,7 @@ const Patients = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
     const [viewMode, setViewMode] = useState('list');
+    const [appointmentPatient, setAppointmentPatient] = useState(null); // { id, name }
 
     const initialFormState = {
         documentType: 'DNI',
@@ -211,17 +213,19 @@ const Patients = () => {
                     >
                         <FileSpreadsheet size={18} /> Exportar
                     </button>
-                    <button
-                        onClick={() => {
-                            setFormData(initialFormState);
-                            setIsEditing(false);
-                            setSelectedId(null);
-                            setShowRegistrationModal(true);
-                        }}
-                        className="flex-1 md:flex-none premium-button-primary"
-                    >
-                        <Plus size={20} /> Nuevo Registro
-                    </button>
+                    {hasPermission('patients:create') && (
+                        <button
+                            onClick={() => {
+                                setFormData(initialFormState);
+                                setIsEditing(false);
+                                setSelectedId(null);
+                                setShowRegistrationModal(true);
+                            }}
+                            className="flex-1 md:flex-none premium-button-primary"
+                        >
+                            <Plus size={20} /> Nuevo Registro
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -322,35 +326,60 @@ const Patients = () => {
                                             </td>
                                             <td className="px-8 py-6 text-right">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <Link
-                                                        to={`/expediente/${p.id}/history`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
+                                                    <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
+                                                            setAppointmentPatient({
+                                                                id: p.id,
+                                                                name: `${p.firstName} ${p.paternalSurname}`
+                                                            });
                                                         }}
-                                                        className="group/hist flex items-center gap-2 lg:gap-0 lg:hover:gap-2 px-3 py-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl text-indigo-500 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm active:scale-95 overflow-hidden"
+                                                        className="group/apt flex items-center gap-2 lg:gap-0 lg:hover:gap-2 px-3 py-2.5 bg-cyan-50/80 border border-cyan-100 rounded-xl text-cyan-600 hover:text-cyan-700 hover:border-cyan-400 transition-all shadow-sm active:scale-95 overflow-hidden"
+                                                        title="Generar Cita"
                                                     >
-                                                        <ClipboardList size={18} className="shrink-0" />
-                                                        <span className="lg:max-w-0 overflow-hidden whitespace-nowrap lg:group-hover/hist:max-w-[120px] max-w-[120px] transition-all duration-500 ease-in-out text-[10px] font-black uppercase tracking-widest leading-none">
-                                                            Abrir Historia
+                                                        <Calendar size={18} className="shrink-0" />
+                                                        <span className="lg:max-w-0 overflow-hidden whitespace-nowrap lg:group-hover/apt:max-w-[120px] max-w-[0px] transition-all duration-500 ease-in-out text-[10px] font-black uppercase tracking-widest leading-none">
+                                                            Generar Cita
                                                         </span>
-                                                    </Link>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleEdit(p, 'filiation');
-                                                        }}
-                                                        className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-cyan-600 hover:border-cyan-500 transition-all shadow-sm active:scale-90"
-                                                    >
-                                                        <Edit2 size={16} />
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleDelete(p.id)}
-                                                        className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-rose-600 hover:border-rose-500 transition-all shadow-sm active:scale-90"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                                    {hasPermission('history:view') && (
+                                                        <Link
+                                                            to={`/expediente/${p.id}/history`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                            }}
+                                                            className="group/hist flex items-center gap-2 lg:gap-0 lg:hover:gap-2 px-3 py-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl text-indigo-500 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm active:scale-95 overflow-hidden"
+                                                        >
+                                                            <ClipboardList size={18} className="shrink-0" />
+                                                            <span className="lg:max-w-0 overflow-hidden whitespace-nowrap lg:group-hover/hist:max-w-[120px] max-w-[120px] transition-all duration-500 ease-in-out text-[10px] font-black uppercase tracking-widest leading-none">
+                                                                Abrir Historia
+                                                            </span>
+                                                        </Link>
+                                                    )}
+                                                    {hasPermission('patients:edit') && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleEdit(p, 'filiation');
+                                                            }}
+                                                            className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-cyan-600 hover:border-cyan-500 transition-all shadow-sm active:scale-90"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                    )}
+                                                    {hasPermission('patients:delete') && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDelete(p.id);
+                                                            }}
+                                                            className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-rose-600 hover:border-rose-500 transition-all shadow-sm active:scale-90"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </motion.tr>
@@ -361,6 +390,16 @@ const Patients = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Quick Appointment Modal (from patient list) */}
+            {appointmentPatient && (
+                <QuickAppointmentModal
+                    patientId={appointmentPatient.id}
+                    patientName={appointmentPatient.name}
+                    onClose={() => setAppointmentPatient(null)}
+                    onSuccess={() => setAppointmentPatient(null)}
+                />
+            )}
 
             {/* High-Fidelity Registration Modal */}
             <PatientRegistrationModal

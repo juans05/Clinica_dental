@@ -10,6 +10,9 @@ import Settings from './pages/settings/Settings';
 import Services from './pages/settings/Services';
 import MainLayout from './components/layout/MainLayout';
 import PatientProfileView from './components/PatientProfileView';
+import OnboardingWizard from './pages/onboarding/OnboardingWizard';
+import Register from './pages/auth/Register';
+import Finance from './pages/finance/Finance';
 import { Loader2 } from 'lucide-react';
 
 const ProtectedRoute = ({ children }) => {
@@ -21,6 +24,7 @@ const ProtectedRoute = ({ children }) => {
     </div>
   );
   if (!user) return <Navigate to="/login" replace />;
+  if (user.needsSetup) return <Navigate to="/setup" replace />;
   return <MainLayout>{children}</MainLayout>;
 };
 
@@ -30,11 +34,14 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/setup" element={<OnboardingWizard />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/patients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
           <Route path="/expediente/:id/:module?" element={<ProtectedRoute><PatientProfileView /></ProtectedRoute>} />
           <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+          <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
           <Route path="/management" element={<ProtectedRoute><Management /></ProtectedRoute>} />
           <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
