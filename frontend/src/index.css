@@ -10,24 +10,28 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 187 100% 42%; /* Cyan 600 equivalent */
+    --primary: 184 100% 15%; /* #00484d equivalent HSL */
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
+    --secondary: 162 89% 77%; /* #91fbdb equivalent HSL */
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 187 100% 92%;
+    --accent: 162 89% 92%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 187 100% 42%;
+    --ring: 184 100% 15%;
     --radius: 1rem;
+
+    /* Dently Specific Colors */
+    --brand-teal: #00484d;
+    --brand-mint: #91fbdb;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased font-sans selection:bg-cyan-100 selection:text-cyan-900;
+    @apply bg-slate-50 text-slate-900 antialiased font-sans selection:bg-mint/30 selection:text-teal;
   }
 }
 

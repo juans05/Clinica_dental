@@ -15,12 +15,11 @@ const Field = ({ label, icon: Icon, error, type = 'text', rightEl, ...props }) =
         <div className="space-y-1.5">
             <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>
             <div className="relative group">
-                {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-cyan-500 transition-colors" size={17} />}
                 <input
                     {...props}
                     type={isPassword ? (show ? 'text' : 'password') : type}
                     className={`w-full ${Icon ? 'pl-11' : 'pl-4'} pr-4 py-3.5 bg-white/60 border rounded-2xl text-sm font-semibold text-slate-800 outline-none transition-all
-                        focus:ring-4 focus:ring-cyan-500/10 focus:border-cyan-400 focus:bg-white
+                        focus:ring-4 focus:ring-teal/10 focus:border-teal focus:bg-white
                         ${error ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`}
                 />
                 {isPassword && (
@@ -56,10 +55,10 @@ const Register = () => {
     const validate = () => {
         const e = {};
         if (!form.companyName.trim()) e.companyName = 'Requerido';
-        if (!form.taxId.trim())       e.taxId = 'Requerido';
+        if (!form.taxId.trim()) e.taxId = 'Requerido';
         if (!/^\d{11}$/.test(form.taxId)) e.taxId = 'El RUC debe tener 11 dígitos';
-        if (!form.adminName.trim())   e.adminName = 'Requerido';
-        if (!form.email.trim())       e.email = 'Requerido';
+        if (!form.adminName.trim()) e.adminName = 'Requerido';
+        if (!form.email.trim()) e.email = 'Requerido';
         if (form.password.length < 8) e.password = 'Mínimo 8 caracteres';
         if (form.password !== form.confirm) e.confirm = 'Las contraseñas no coinciden';
         setErrors(e);
@@ -97,8 +96,8 @@ const Register = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden font-sans py-8">
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-200/20 rounded-full blur-[120px] animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-200/20 rounded-full blur-[120px] animate-pulse delay-1000" />
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal/10 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-mint/10 rounded-full blur-[120px] animate-pulse delay-1000" />
 
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -112,16 +111,22 @@ const Register = () => {
 
                     <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-12">
-                            <div className="h-12 w-12 bg-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/40">
-                                <Stethoscope size={28} />
+                            <div className="h-12 w-12 bg-teal rounded-2xl flex items-center justify-center shadow-lg shadow-teal/40">
+                                <svg viewBox="0 0 100 100" className="w-8 h-8 fill-none stroke-white stroke-[6]">
+                                    <path d="M50 85C40 85 20 75 20 50C20 25 35 15 50 15C65 15 80 25 80 50C80 75 60 85 50 85Z" className="stroke-mint/30" />
+                                    <path d="M45 25C35 25 25 35 25 50C25 65 35 75 45 75C55 75 70 65 70 50C70 35 55 25 45 25Z" className="fill-mint" />
+                                    <circle cx="50" cy="50" r="10" className="fill-teal" />
+                                </svg>
                             </div>
-                            <div className="font-black text-2xl tracking-tight">
-                                SGD <span className="text-cyan-400 font-medium">Dental</span>
+                            <div className="font-black text-3xl tracking-tighter flex items-baseline gap-0.5">
+                                <span className="text-teal-400">D</span>
+                                <span>ently</span>
+                                <span className="h-2 w-2 rounded-full bg-mint ml-1" />
                             </div>
                         </div>
 
                         <h2 className="text-4xl font-black mb-4 leading-[1.1] tracking-tight">
-                            Crea tu <br /><span className="text-cyan-400">clínica digital.</span>
+                            Crea tu <br /><span className="text-mint">clínica digital.</span>
                         </h2>
                         <p className="text-slate-400 font-medium leading-relaxed max-w-[260px]">
                             En 2 minutos tendrás tu sistema listo. Sin instalaciones, sin complicaciones.
@@ -135,7 +140,7 @@ const Register = () => {
                                 'Soporte personalizado incluido'
                             ].map(f => (
                                 <div key={f} className="flex items-center gap-3 text-sm text-slate-400">
-                                    <div className="h-5 w-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">✓</div>
+                                    <div className="h-5 w-5 rounded-full bg-teal text-mint flex items-center justify-center shrink-0 text-xs font-bold">✓</div>
                                     {f}
                                 </div>
                             ))}
@@ -148,10 +153,10 @@ const Register = () => {
                             Seguridad de Grado Médico
                         </div>
                         <p className="text-[11px] text-slate-500 font-medium mt-2">
-                            © 2026 SGD Dental Suite. Todos los derechos reservados.
+                            © 2026 Dently Suite. Todos los derechos reservados.
                         </p>
                     </div>
-                    <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl" />
+                    <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-teal/10 rounded-full blur-3xl" />
                 </div>
 
                 {/* Panel derecho */}
@@ -160,7 +165,7 @@ const Register = () => {
                         <h2 className="text-2xl font-black text-slate-800 tracking-tight mb-1">Crear cuenta gratuita</h2>
                         <p className="text-slate-500 text-sm font-medium">
                             ¿Ya tienes cuenta?{' '}
-                            <Link to="/login" className="text-cyan-600 font-black hover:text-cyan-700 transition-colors">
+                            <Link to="/login" className="text-teal font-black hover:text-teal/80 transition-colors">
                                 Inicia sesión aquí
                             </Link>
                         </p>
@@ -232,7 +237,7 @@ const Register = () => {
                                     </>
                                 )}
                             </span>
-                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-gradient-to-r from-teal to-teal/80 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
 
                         <p className="text-center text-[10px] text-slate-400 font-medium leading-relaxed">

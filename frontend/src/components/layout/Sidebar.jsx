@@ -80,17 +80,23 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             >
                 {/* Logo Section */}
                 <div className="p-6 flex items-center gap-3">
-                    <div className="h-10 w-10 shrink-0 bg-cyan-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-cyan-500/30">
-                        <Stethoscope size={24} />
+                    <div className="h-10 w-10 shrink-0 bg-teal rounded-xl flex items-center justify-center text-white shadow-lg shadow-teal/30 group relative overflow-hidden">
+                        {/* Custom Isotipo: Tooth + D shape */}
+                        <svg viewBox="0 0 100 100" className="w-6 h-6 fill-none stroke-current stroke-[6]">
+                            <path d="M50 85C40 85 20 75 20 50C20 25 35 15 50 15C65 15 80 25 80 50C80 75 60 85 50 85Z" className="stroke-mint/30" />
+                            <path d="M45 25C35 25 25 35 25 50C25 65 35 75 45 75C55 75 70 65 70 50C70 35 55 25 45 25Z" className="fill-mint" />
+                            <circle cx="50" cy="50" r="10" className="fill-teal" />
+                        </svg>
                     </div>
                     {!isCollapsed && (
                         <motion.div
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="font-black text-xl tracking-tight text-white flex flex-col"
+                            className="font-black text-2xl tracking-tighter text-white flex items-baseline gap-0.5"
                         >
-                            <span>SGD</span>
-                            <span className="text-[10px] text-cyan-400 uppercase tracking-[0.2em] font-bold">Dental Care</span>
+                            <span className="text-teal-400">D</span>
+                            <span>ently</span>
+                            <span className="h-1.5 w-1.5 rounded-full bg-mint ml-1" />
                         </motion.div>
                     )}
                 </div>
@@ -104,7 +110,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                             className={({ isActive }) => cn(
                                 "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative",
                                 isActive
-                                    ? "bg-cyan-600 text-white shadow-lg shadow-cyan-600/20"
+                                    ? "bg-teal text-white shadow-lg shadow-teal/20"
                                     : "hover:bg-slate-800 text-slate-400 hover:text-slate-200"
                             )}
                         >

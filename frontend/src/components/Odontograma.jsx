@@ -54,25 +54,26 @@ const PROTOCOL_COLORS = {
 
 const MINSA_FINDINGS = [
     // GRUPO: Lesión de Caries (ROJO)
-    { id: 'MB', label: 'Mancha Blanca', sigla: 'MB', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
-    { id: 'CE', label: 'Caries Esmalte', sigla: 'CE', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
-    { id: 'CD', label: 'Caries Dentina', sigla: 'CD', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
-    { id: 'CDP', label: 'Caries Dentina/Pulpa', sigla: 'CDP', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
+    { id: 'MB', label: 'Mancha Blanca', sigla: 'MB', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'CE', label: 'Caries Esmalte', sigla: 'CE', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'CD', label: 'Caries Dentina', sigla: 'CD', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'CDP', label: 'Caries Dentina/Pulpa', sigla: 'CDP', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'CC', label: 'Caries Cervical', sigla: 'CC', group: 'CARIES', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
 
     // GRUPO: Defectos de Desarrollo del Esmalte (ROJO)
-    { id: 'HP', label: 'Hipoplasia', sigla: 'HP', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box' },
-    { id: 'HM', label: 'Hipomineralización', sigla: 'HM', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box' },
-    { id: 'O', label: 'Opacidad Esmalte', sigla: 'O', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box' },
-    { id: 'D', label: 'Decoloración Esmalte', sigla: 'D', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box' },
+    { id: 'HP', label: 'Hipoplasia', sigla: 'HP', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box', requiresSurfaces: true },
+    { id: 'HM', label: 'Hipomineralización', sigla: 'HM', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box', requiresSurfaces: true },
+    { id: 'O', label: 'Opacidad Esmalte', sigla: 'O', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box', requiresSurfaces: true },
+    { id: 'D', label: 'Decoloración Esmalte', sigla: 'D', group: 'DDE', color: PROTOCOL_COLORS.RED, type: 'box', requiresSurfaces: true },
 
     // GRUPO: Restauraciones (A/R)
-    { id: 'AM', label: 'Amalgama Dental', sigla: 'AM', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
-    { id: 'R', label: 'Resina Compuesta', sigla: 'R', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
-    { id: 'IV', label: 'Ionómero de Vidrio', sigla: 'IV', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
-    { id: 'IM', label: 'Incrustación Metálica', sigla: 'IM', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
-    { id: 'IE', label: 'Incrustación Estética', sigla: 'IE', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled' },
-    { id: 'C', label: 'Carilla Estética', sigla: 'C', group: 'RESTORATION', type: 'drawing', visual: 'veneer' },
-    { id: 'RT', label: 'Restauración Temporal', sigla: 'RT', group: 'RESTORATION', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled' },
+    { id: 'AM', label: 'Amalgama Dental', sigla: 'AM', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'R', label: 'Resina Compuesta', sigla: 'R', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'IV', label: 'Ionómero de Vidrio', sigla: 'IV', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'IM', label: 'Incrustación Metálica', sigla: 'IM', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'IE', label: 'Incrustación Estética', sigla: 'IE', group: 'RESTORATION', type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
+    { id: 'C', label: 'Carilla Estética', sigla: 'C', group: 'RESTORATION', type: 'drawing', visual: 'veneer', requiresSurfaces: true },
+    { id: 'RT', label: 'Restauración Temporal', sigla: 'RT', group: 'RESTORATION', color: PROTOCOL_COLORS.RED, type: 'drawing', visual: 'surface_filled', requiresSurfaces: true },
 
     // GRUPO: Sellante (A/R)
     { id: 'S', label: 'Sellante', sigla: 'S', group: 'SEALANT', type: 'drawing', visual: 'surface_mark' },
@@ -600,6 +601,117 @@ const sc = (tooth, s) => {
     return dataList[0]?.color || null;
 };
 
+// ─── Interactive Surface Square Helper ────────────────────────────────────
+const ToothSurfaceSquare = ({ tooth, number, onMarkSurface, selectedFinding, findingState, isReadOnly }) => {
+    const isU = isUpper(number);
+    const isR = [1, 4, 5, 8].includes(Math.floor(number / 10));
+
+    // Mapping of internal identifier to visual label
+    const surfaces = [
+        { id: 'V', label: 'V' }, // Vestibular
+        { id: 'L', label: 'L' }, // Lingual/Palatino
+        { id: 'M', label: 'M' }, // Mesial
+        { id: 'D', label: 'D' }, // Distal
+        { id: 'O', label: 'O' }  // Oclusal/Incisal
+    ];
+
+    const getSurfaceStatus = (s) => {
+        return tooth.surfaces[s]?.length > 0;
+    };
+
+    const handleToggle = (s) => {
+        if (isReadOnly) return;
+        const condition = selectedFinding ? `${selectedFinding.id}:${findingState}` : null;
+        onMarkSurface(number, s, condition);
+    };
+
+    // Correct positioning of labels based on NTS-150 / Dental charts:
+    // Vertical: V is always at the outer edge, L towards center.
+    // Horizontal: M is towards midline, D towards periphery.
+
+    // In our SVG logic:
+    // Upper arch: V=Top, L=Bottom
+    // Lower arch: V=Bottom, L=Top
+    // Handled by ToothSVG, let's keep it consistent here.
+
+    return (
+        <div className="flex flex-col items-center gap-4">
+            <div className="relative w-48 h-48 bg-slate-100 rounded-2xl p-4 shadow-inner border border-slate-200">
+                {/* SVG for the square divisions */}
+                <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md">
+                    {/* Vestibular (V) */}
+                    <path
+                        d="M 0,0 L 100,0 L 75,25 L 25,25 Z"
+                        transform={isU ? "" : "rotate(180, 50, 50)"}
+                        className={cn(
+                            "cursor-pointer transition-all duration-200",
+                            getSurfaceStatus('V') ? "fill-blue-600 stroke-blue-700" : "fill-white stroke-slate-300 hover:fill-blue-50"
+                        )}
+                        onClick={() => handleToggle('V')}
+                    />
+                    {/* Lingual/Palatal (L) */}
+                    <path
+                        d="M 25,75 L 75,75 L 100,100 L 0,100 Z"
+                        transform={isU ? "" : "rotate(180, 50, 50)"}
+                        className={cn(
+                            "cursor-pointer transition-all duration-200",
+                            getSurfaceStatus('L') ? "fill-blue-600 stroke-blue-700" : "fill-white stroke-slate-300 hover:fill-blue-50"
+                        )}
+                        onClick={() => handleToggle('L')}
+                    />
+                    {/* Mesial (M) */}
+                    <path
+                        d="M 100,0 L 100,100 L 75,75 L 75,25 Z"
+                        transform={isR ? "" : "rotate(180, 50, 50)"}
+                        className={cn(
+                            "cursor-pointer transition-all duration-200",
+                            getSurfaceStatus('M') ? "fill-blue-600 stroke-blue-700" : "fill-white stroke-slate-300 hover:fill-blue-50"
+                        )}
+                        onClick={() => handleToggle('M')}
+                    />
+                    {/* Distal (D) */}
+                    <path
+                        d="M 0,0 L 25,25 L 25,75 L 0,100 Z"
+                        transform={isR ? "" : "rotate(180, 50, 50)"}
+                        className={cn(
+                            "cursor-pointer transition-all duration-200",
+                            getSurfaceStatus('D') ? "fill-blue-600 stroke-blue-700" : "fill-white stroke-slate-300 hover:fill-blue-50"
+                        )}
+                        onClick={() => handleToggle('D')}
+                    />
+                    {/* Oclusal (O) */}
+                    <rect
+                        x="25" y="25" width="50" height="50"
+                        className={cn(
+                            "cursor-pointer transition-all duration-200",
+                            getSurfaceStatus('O') ? "fill-blue-600 stroke-blue-700" : "fill-white stroke-slate-300 hover:fill-blue-50"
+                        )}
+                        onClick={() => handleToggle('O')}
+                    />
+
+                    {/* Labels */}
+                    <g className="pointer-events-none font-black text-[8px]" fill="currentColor">
+                        {/* V Label */}
+                        <text x="50" y={isU ? "15" : "85"} textAnchor="middle" className={getSurfaceStatus('V') ? "fill-white" : "fill-slate-400"}>V</text>
+                        {/* L Label */}
+                        <text x="50" y={isU ? "85" : "15"} textAnchor="middle" className={getSurfaceStatus('L') ? "fill-white" : "fill-slate-400"}>L</text>
+                        {/* M Label */}
+                        <text x={isR ? "85" : "15"} y="50" dominantBaseline="middle" textAnchor="middle" className={getSurfaceStatus('M') ? "fill-white" : "fill-slate-400"}>M</text>
+                        {/* D Label */}
+                        <text x={isR ? "15" : "85"} y="50" dominantBaseline="middle" textAnchor="middle" className={getSurfaceStatus('D') ? "fill-white" : "fill-slate-400"}>D</text>
+                        {/* O Label */}
+                        <text x="50" y="50" dominantBaseline="middle" textAnchor="middle" className={cn("text-[10px]", getSurfaceStatus('O') ? "fill-white" : "fill-slate-400")}>O</text>
+                    </g>
+                </svg>
+            </div>
+            <div className="flex gap-2 text-[10px] font-bold text-slate-400">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-600" /> Marcado</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-white border border-slate-300" /> Vacío</span>
+            </div>
+        </div>
+    );
+};
+
 const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, onMarkSurface, onSetNote, patientId, activeMode, readOnlyOverride }) => {
     if (!tooth) return null;
 
@@ -769,38 +881,58 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 lg:grid-cols-12 gap-10 custom-scrollbar">
-                    {/* Col 1: Surface & Selectors */}
+                    {/* Col 1: Surface & Identification */}
                     <div className={cn(activeMode === 'EVOLUTION' ? "lg:col-span-6" : "lg:col-span-3", "space-y-8")}>
                         <div className="bg-slate-50/50 rounded-[32px] border border-slate-100 p-8 shadow-inner">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
                                 <Box size={14} /> MAPA DE SUPERFICIES
                             </h3>
-                            <div className="flex justify-center py-6">
-                                <div className="relative w-40 h-40">
+
+                            {selectedFinding?.group === 'CARIES' ? (
+                                <ToothSurfaceSquare
+                                    tooth={tooth}
+                                    number={number}
+                                    onMarkSurface={onMarkSurface}
+                                    selectedFinding={selectedFinding}
+                                    findingState={findingState}
+                                    isReadOnly={isReadOnly}
+                                />
+                            ) : (
+                                <div className="relative w-40 h-40 mx-auto">
+                                    <div className="absolute inset-4 bg-slate-200/50 rounded-2xl rotate-45 border border-slate-300/50" />
                                     {['V', 'L', 'M', 'D', 'O'].map(s => (
                                         <button
                                             key={s}
-                                            disabled={isReadOnly}
                                             onClick={() => onMarkSurface(number, s, selectedFinding?.id ? `${selectedFinding.id}:${findingState}` : null)}
-                                            className={cn(
-                                                "absolute border-2 transition-all flex items-center justify-center text-[12px] font-black shadow-sm",
-                                                tooth.surfaces[s]?.length > 0
-                                                    ? "bg-blue-600 border-blue-700 text-white shadow-lg scale-110 z-20"
-                                                    : "bg-white border-slate-200 text-slate-400 hover:border-blue-400 hover:scale-105"
-                                            )}
                                             style={{
-                                                width: '42px', height: '42px', borderRadius: '12px',
+                                                position: 'absolute',
+                                                width: '42px',
+                                                height: '42px',
                                                 top: s === 'V' ? '0' : (s === 'L' ? 'auto' : '50%'),
                                                 bottom: s === 'L' ? '0' : 'auto',
                                                 left: (s === 'V' || s === 'L' || s === 'O') ? '50%' : (s === 'M' ? '0' : 'auto'),
                                                 right: s === 'D' ? '0' : 'auto',
-                                                transform: (s === 'V' || s === 'L') ? 'translateX(-50%)' : ((s === 'M' || s === 'D') ? 'translateY(-50%)' : 'translate(-50%, -50%)'),
-                                                zIndex: s === 'O' ? 10 : 5,
+                                                transform: (s === 'V' || s === 'L' || s === 'O') ? 'translateX(-50%)' : (s === 'M' || s === 'D' ? 'translateY(-50%)' : 'none'),
+                                                zIndex: s === 'O' ? '10' : '1'
                                             }}
+                                            className={cn(
+                                                "rounded-xl text-[10px] font-black transition-all border shadow-sm",
+                                                (tooth.surfaces[s] || []).length > 0
+                                                    ? "bg-blue-600 border-blue-700 text-white shadow-blue-200"
+                                                    : "bg-white border-slate-200 text-slate-400 hover:border-blue-300"
+                                            )}
                                         >
                                             {s}
                                         </button>
                                     ))}
+                                </div>
+                            )}
+
+                            <div className="mt-8 pt-8 border-t border-slate-100 space-y-4">
+                                <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-widest text-center">Identificación</h4>
+                                <div className="flex font-black text-blue-100 items-baseline justify-center gap-2">
+                                    <span className="text-5xl">{number}</span>
+                                    <span className="text-xl uppercase">{isUpper(number) ? 'Sup' : 'Inf'}</span>
                                 </div>
                             </div>
                         </div>
@@ -820,67 +952,114 @@ const ToothDetailModal = ({ tooth, number, onClose, onMarkTeeth, onMarkTooth, on
                     {/* Col 2: Finding Search & Selection */}
                     {activeMode !== 'EVOLUTION' && (
                         <div className="lg:col-span-5 space-y-6 lg:border-x lg:px-10 border-slate-100">
-                            <div className="space-y-4">
-                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">AÑADIR CONDICIÓN</h3>
-                                <div className="relative">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar por nombre o sigla..."
-                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                        value={search}
-                                        onChange={e => setSearch(e.target.value)}
-                                    />
-                                </div>
-                                <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar space-y-6">
-                                    {[
-                                        { id: 'CARIES', label: 'Lesión de Caries' },
-                                        { id: 'DDE', label: 'Defectos de Esmalte' },
-                                        { id: 'RESTORATION', label: 'Restauraciones' },
-                                        { id: 'SEALANT', label: 'Sellantes' },
-                                        { id: 'PULPAR', label: 'Tratamiento Pulpar' },
-                                        { id: 'PROSTHESIS', label: 'Prótesis y Coronas' },
-                                        { id: 'POSITION', label: 'Anomalías y Posición' },
-                                        { id: 'ORTHO', label: 'Ortodoncia' },
-                                        { id: 'OTHERS', label: 'Otros Hallazgos' },
-                                    ].map(group => {
-                                        const findingsInGroup = filteredFindings.filter(f => f.group === group.id);
-                                        if (findingsInGroup.length === 0) return null;
-
-                                        return (
-                                            <div key={group.id} className="space-y-3">
-                                                <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-1">{group.label}</h4>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    {findingsInGroup.map(f => (
-                                                        <button
-                                                            key={f.id}
-                                                            onClick={() => {
-                                                                setSelectedFinding(f);
-                                                                setSubSelection([]);
-                                                            }}
-                                                            className={cn(
-                                                                "p-3 rounded-xl border transition-all text-left flex items-center justify-between group h-full",
-                                                                selectedFinding?.id === f.id
-                                                                    ? "bg-slate-900 border-slate-900 text-white shadow-lg"
-                                                                    : "bg-white border-slate-100 text-slate-600 hover:border-blue-200"
-                                                            )}
-                                                        >
-                                                            <div className="flex items-center gap-2.5">
-                                                                <div
-                                                                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                                                                    style={{ backgroundColor: f.color || (f.group === 'CARIES' ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE) }}
-                                                                />
-                                                                <span className="font-bold text-[10px] leading-tight uppercase truncate">{f.label}</span>
-                                                            </div>
-                                                            {selectedFinding?.id === f.id && <Check size={14} className="text-blue-400" />}
-                                                        </button>
-                                                    ))}
+                            {selectedFinding?.group === 'CARIES' ? (
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Activity size={14} className="text-rose-500" /> TIPO DE LESIÓN
+                                        </h3>
+                                        <button
+                                            onClick={() => setSelectedFinding(null)}
+                                            className="text-[10px] font-bold text-blue-600 hover:underline"
+                                        >
+                                            Ver todos los hallazgos
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {filteredFindings.filter(f => f.group === 'CARIES').map(f => (
+                                            <button
+                                                key={f.id}
+                                                onClick={() => setSelectedFinding(f)}
+                                                className={cn(
+                                                    "p-5 rounded-2xl border transition-all text-left flex items-center justify-between group h-full",
+                                                    selectedFinding?.id === f.id
+                                                        ? "bg-slate-900 border-slate-900 text-white shadow-xl scale-[1.02]"
+                                                        : "bg-white border-slate-100 text-slate-600 hover:border-rose-200"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center font-black text-rose-600 text-xs">
+                                                        {f.sigla}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-black text-sm uppercase">{f.label}</div>
+                                                        <div className="text-[10px] opacity-60 font-medium">Nivel de profundidad: {f.label}</div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                                {selectedFinding?.id === f.id && <CheckCircle size={20} className="text-rose-500" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="bg-rose-50 p-4 rounded-xl border border-rose-100">
+                                        <p className="text-[10px] text-rose-600 font-bold leading-relaxed">
+                                            <Info size={12} className="inline mr-1 mb-0.5" />
+                                            Seleccione las superficies en el diagrama de la izquierda para aplicar la lesión seleccionada.
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">AÑADIR CONDICIÓN</h3>
+                                    <div className="relative">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar por nombre o sigla..."
+                                            className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                            value={search}
+                                            onChange={e => setSearch(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar space-y-6">
+                                        {[
+                                            { id: 'CARIES', label: 'Lesión de Caries' },
+                                            { id: 'DDE', label: 'Defectos de Esmalte' },
+                                            { id: 'RESTORATION', label: 'Restauraciones' },
+                                            { id: 'SEALANT', label: 'Sellantes' },
+                                            { id: 'PULPAR', label: 'Tratamiento Pulpar' },
+                                            { id: 'PROSTHESIS', label: 'Prótesis y Coronas' },
+                                            { id: 'POSITION', label: 'Anomalías y Posición' },
+                                            { id: 'ORTHO', label: 'Ortodoncia' },
+                                            { id: 'OTHERS', label: 'Otros Hallazgos' },
+                                        ].map(group => {
+                                            const findingsInGroup = filteredFindings.filter(f => f.group === group.id);
+                                            if (findingsInGroup.length === 0) return null;
+
+                                            return (
+                                                <div key={group.id} className="space-y-3">
+                                                    <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pl-1">{group.label}</h4>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {findingsInGroup.map(f => (
+                                                            <button
+                                                                key={f.id}
+                                                                onClick={() => {
+                                                                    setSelectedFinding(f);
+                                                                    setSubSelection([]);
+                                                                }}
+                                                                className={cn(
+                                                                    "p-3 rounded-xl border transition-all text-left flex items-center justify-between group h-full",
+                                                                    selectedFinding?.id === f.id
+                                                                        ? "bg-slate-900 border-slate-900 text-white shadow-lg"
+                                                                        : "bg-white border-slate-100 text-slate-600 hover:border-blue-200"
+                                                                )}
+                                                            >
+                                                                <div className="flex items-center gap-2.5">
+                                                                    <div
+                                                                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                                        style={{ backgroundColor: f.color || (f.group === 'CARIES' ? PROTOCOL_COLORS.RED : PROTOCOL_COLORS.BLUE) }}
+                                                                    />
+                                                                    <span className="font-bold text-[10px] leading-tight uppercase truncate">{f.label}</span>
+                                                                </div>
+                                                                {selectedFinding?.id === f.id && <Check size={14} className="text-blue-400" />}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1065,16 +1244,14 @@ const EvolutionPopover = ({ anchor, onClose, onSelect, currentState }) => {
 
 // Helper to map CM_HISTORIA_CLINICA geometries
 const getToothShapes = (number, isUpperTooth) => {
-    // Top, Left, Bottom, Right, Center
-    // Base dimensions from old project: 30x30 for crown
+    // Standard 5-surface crown for all teeth (anatomical diagrams in NTS-150 use 5 divisions for all)
+    // top/bottom are V/L or L/V depending on arch, as mapped in ToothSVG
     const crowns = {
         top: isUpperTooth ? "0,30 30,30 20,20 10,20" : "0,0 30,0 20,10 10,10",
         left: "0,0 10,10 10,20 0,30",
         bottom: isUpperTooth ? "0,0 10,10 20,10 30,0" : "0,30 10,20 20,20 30,30",
         right: "30,0 20,10 20,20 30,30",
-        center: isUpperTooth
-            ? "10,10 20,10 20,20 10,20 10,20 13.33,20 13.33,10 16.33,10 16.33,20 20,20 20,15 10,15 10,20 20,20 20,10 10,10"
-            : "10,10 20,10 20,20 10,20 10,10 13.33,10 13.33,20 16.33,20 16.33,10 20,10 20,15 10,15 10,10 20,10 20,20 10,20"
+        center: "10,10 20,10 20,20 10,20"
     };
 
     let roots = [];
@@ -1085,28 +1262,16 @@ const getToothShapes = (number, isUpperTooth) => {
             "10,30 15,50 20,30",
             "20,30 25,50 30,30"
         ];
-    } else if ([14, 24].includes(number)) {
-        roots = [
-            "5,30 10,50 15,30",
-            "15,30 20,50 25,30"
-        ];
-    } else if ([15, 25, 34, 35, 44, 45].includes(number)) {
-        roots = [
-            "10,30 15,50 20,30"
-        ];
+    } else if ([14, 24, 34, 44, 35, 45, 15, 25].includes(number) || isPremolar(number)) {
+        // Double or single roots for premolars
+        if ([14, 24].includes(number)) {
+            roots = ["5,30 10,50 15,30", "15,30 20,50 25,30"];
+        } else {
+            roots = ["10,30 15,50 20,30"];
+        }
     } else {
         // Incisors / Canines
-        roots = [
-            "10,30 15,50 20,30"
-        ];
-        // Incisors have slightly different crown centers in the old code,
-        // but it's simpler to use the same logic or adapt it. 
-        // We'll use the exact coordinates from the old index.tsx for incisors.
-        crowns.top = isUpperTooth ? "0,30 30,30 20,15 10,15" : "0,0 30,0 20,15 10,15";
-        crowns.left = "0,0 10,15 0,30";
-        crowns.bottom = isUpperTooth ? "0,0 10,15 20,15 30,0" : "0,30 10,15 20,15 30,30";
-        crowns.right = "30,0 20,15 30,30";
-        crowns.center = ""; // No center for incisors in old project
+        roots = ["10,30 15,50 20,30"];
     }
 
     return { crowns, roots };
@@ -1132,8 +1297,8 @@ const ToothSVG = ({ number, data, isSelected, onTooth, onSurface, mode = 'INITIA
     const { crowns, roots } = getToothShapes(number, isUpperTooth);
 
     const surfMap = {
-        V: isUpperTooth ? crowns.bottom : crowns.top,
-        L: isUpperTooth ? crowns.top : crowns.bottom,
+        V: isUpperTooth ? crowns.top : crowns.bottom,
+        L: isUpperTooth ? crowns.bottom : crowns.top,
         M: crowns.left, // Default, will be adjusted
         D: crowns.right, // Default, will be adjusted
         O: crowns.center
@@ -1758,343 +1923,343 @@ const Odontograma = ({ patientId }) => {
 
     return (
         <>
-        <div className="pt-2">
-            <AnimatePresence>
-                {detailTooth && (
-                    <ToothDetailModal
-                        number={detailTooth.number}
-                        tooth={teeth[detailTooth.number]}
-                        patientId={patientId}
-                        activeMode={activeMode}
-                        readOnlyOverride={isReadOnlyVisit}
-                        onClose={() => setDetailTooth(null)}
-                        onMarkTeeth={markTeeth}
-                        onMarkTooth={markTooth}
-                        onMarkSurface={markSurface}
-                        onSetNote={setNote}
-                    />
-                )}
-            </AnimatePresence>
+            <div className="pt-2">
+                <AnimatePresence>
+                    {detailTooth && (
+                        <ToothDetailModal
+                            number={detailTooth.number}
+                            tooth={teeth[detailTooth.number]}
+                            patientId={patientId}
+                            activeMode={activeMode}
+                            readOnlyOverride={isReadOnlyVisit}
+                            onClose={() => setDetailTooth(null)}
+                            onMarkTeeth={markTeeth}
+                            onMarkTooth={markTooth}
+                            onMarkSurface={markSurface}
+                            onSetNote={setNote}
+                        />
+                    )}
+                </AnimatePresence>
 
-            {/* ── Official Protocol Header ── */}
-            <div className="flex items-center justify-between border-b border-slate-200 mb-6 pb-2">
-                <div className="flex gap-8 items-center">
-                    {[
-                        { id: 'INITIAL', label: 'ODONTOGRAMA INICIAL' },
-                        { id: 'EVOLUTION', label: 'ODONTOGRAMA DE EVOLUCIÓN' }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveMode(tab.id)}
-                            className={cn(
-                                "pb-3 text-[13px] font-black tracking-wider transition-all relative px-2",
-                                activeMode === tab.id ? "text-blue-700" : "text-slate-400"
-                            )}>
-                            {tab.label}
-                            {activeMode === tab.id && <div className="absolute bottom-0 inset-x-0 h-1 bg-blue-600 rounded-t-full" />}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="flex items-center gap-4 text-[13px] font-bold text-slate-700 bg-slate-50 px-6 py-2 rounded-xl border border-slate-200 shadow-inner">
-                    <span className="text-slate-400">FECHA:</span>
-                    <span className="border-b border-slate-400 min-w-[120px] text-center">
-                        {new Date().toLocaleDateString('es-PE')}
-                    </span>
-                </div>
-            </div>
-
-            {/* ── Visit History Panel ── */}
-            {allVisits.length > 0 && (
-                <div className="flex items-center gap-3 mb-4 px-1 flex-wrap">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap flex items-center gap-1.5">
-                        <Calendar size={11} /> Consultas:
-                    </span>
-                    <div className="flex gap-2 flex-wrap flex-1">
-                        {[...allVisits].reverse().map((visit, idx) => {
-                            const isActive = visit.id === currentVisitId;
-                            const isLatest = visit.id === allVisits[0].id;
-                            const date = new Date(visit.visitDate || visit.createdAt).toLocaleDateString('es-PE');
-                            return (
-                                <button
-                                    key={visit.id}
-                                    onClick={() => switchVisit(visit.id)}
-                                    className={cn(
-                                        'px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all',
-                                        isActive
-                                            ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100'
-                                            : isLatest
-                                                ? 'bg-slate-900 text-white border-slate-900'
-                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-                                    )}
-                                >
-                                    <span className="opacity-60">Consulta {idx + 1}</span>
-                                    <span className="ml-1.5">{date}</span>
-                                    {isLatest && !isActive && <span className="ml-1 text-emerald-400">●</span>}
-                                </button>
-                            );
-                        })}
+                {/* ── Official Protocol Header ── */}
+                <div className="flex items-center justify-between border-b border-slate-200 mb-6 pb-2">
+                    <div className="flex gap-8 items-center">
+                        {[
+                            { id: 'INITIAL', label: 'ODONTOGRAMA INICIAL' },
+                            { id: 'EVOLUTION', label: 'ODONTOGRAMA DE EVOLUCIÓN' }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveMode(tab.id)}
+                                className={cn(
+                                    "pb-3 text-[13px] font-black tracking-wider transition-all relative px-2",
+                                    activeMode === tab.id ? "text-teal" : "text-slate-400"
+                                )}>
+                                {tab.label}
+                                {activeMode === tab.id && <div className="absolute bottom-0 inset-x-0 h-1 bg-teal rounded-t-full" />}
+                            </button>
+                        ))}
                     </div>
-                    <button
-                        onClick={() => setShowNewVisitModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[10px] font-black hover:bg-emerald-100 transition-all whitespace-nowrap"
-                    >
-                        + Nueva Consulta
-                    </button>
-                </div>
-            )}
 
-            {/* Read-only banner for past visits */}
-            {isReadOnlyVisit && (
-                <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-4">
-                    <div className="flex items-center gap-2.5">
-                        <Lock size={16} className="text-amber-600" />
-                        <div>
-                            <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Consulta anterior — Solo lectura</p>
-                            <p className="text-[10px] text-amber-600 mt-0.5">Este odontograma es histórico y no puede modificarse. Selecciona la consulta más reciente para editar o crea una nueva.</p>
+                    <div className="flex items-center gap-4 text-[13px] font-bold text-slate-700 bg-slate-50 px-6 py-2 rounded-xl border border-slate-200 shadow-inner">
+                        <span className="text-slate-400">FECHA:</span>
+                        <span className="border-b border-slate-400 min-w-[120px] text-center">
+                            {new Date().toLocaleDateString('es-PE')}
+                        </span>
+                    </div>
+                </div>
+
+                {/* ── Visit History Panel ── */}
+                {allVisits.length > 0 && (
+                    <div className="flex items-center gap-3 mb-4 px-1 flex-wrap">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap flex items-center gap-1.5">
+                            <Calendar size={11} /> Consultas:
+                        </span>
+                        <div className="flex gap-2 flex-wrap flex-1">
+                            {[...allVisits].reverse().map((visit, idx) => {
+                                const isActive = visit.id === currentVisitId;
+                                const isLatest = visit.id === allVisits[0].id;
+                                const date = new Date(visit.visitDate || visit.createdAt).toLocaleDateString('es-PE');
+                                return (
+                                    <button
+                                        key={visit.id}
+                                        onClick={() => switchVisit(visit.id)}
+                                        className={cn(
+                                            'px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all',
+                                            isActive
+                                                ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100'
+                                                : isLatest
+                                                    ? 'bg-slate-900 text-white border-slate-900'
+                                                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                                        )}
+                                    >
+                                        <span className="opacity-60">Consulta {idx + 1}</span>
+                                        <span className="ml-1.5">{date}</span>
+                                        {isLatest && !isActive && <span className="ml-1 text-emerald-400">●</span>}
+                                    </button>
+                                );
+                            })}
                         </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => switchVisit(allVisits[0].id)}
-                            className="px-4 py-2 bg-amber-600 text-white rounded-xl text-[10px] font-black hover:bg-amber-700 transition-all"
-                        >
-                            Ir a actual
-                        </button>
                         <button
                             onClick={() => setShowNewVisitModal(true)}
-                            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black hover:bg-black transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[10px] font-black hover:bg-emerald-100 transition-all whitespace-nowrap"
                         >
-                            + Nueva consulta
+                            + Nueva Consulta
                         </button>
-                    </div>
-                </div>
-            )}
-
-            {/* New Visit Modal */}
-            <AnimatePresence>
-                {showNewVisitModal && (
-                    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.97 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.97 }}
-                            className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 space-y-6 mx-4"
-                        >
-                            <div>
-                                <h2 className="text-xl font-black text-slate-800">Nueva Consulta</h2>
-                                <p className="text-[11px] text-slate-400 mt-1">Se creará un nuevo odontograma en blanco para esta visita. El anterior quedará guardado como consulta histórica.</p>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Notas de la sesión (opcional)</label>
-                                <textarea
-                                    value={newVisitNotes}
-                                    onChange={e => setNewVisitNotes(e.target.value)}
-                                    placeholder="Ej: Control post-operatorio, revisión rutinaria..."
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none h-28"
-                                />
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowNewVisitModal(false)}
-                                    className="flex-1 py-3 border border-slate-200 rounded-xl text-[11px] font-black text-slate-500 hover:bg-slate-50 transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleCreateNewVisit}
-                                    disabled={creatingVisit}
-                                    className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[11px] font-black hover:bg-black transition-all disabled:opacity-50"
-                                >
-                                    {creatingVisit ? 'Creando...' : '✓ Crear nueva consulta'}
-                                </button>
-                            </div>
-                        </motion.div>
                     </div>
                 )}
-            </AnimatePresence>
 
-            {/* ── Sub Header: Legend & Actions ── */}
-            <div className="flex items-center justify-between mb-8 px-4">
-                <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 rounded-md bg-[#DC2626] shadow-sm" />
-                        <span className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Patología / Mal Estado</span>
+                {/* Read-only banner for past visits */}
+                {isReadOnlyVisit && (
+                    <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-4">
+                        <div className="flex items-center gap-2.5">
+                            <Lock size={16} className="text-amber-600" />
+                            <div>
+                                <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Consulta anterior — Solo lectura</p>
+                                <p className="text-[10px] text-amber-600 mt-0.5">Este odontograma es histórico y no puede modificarse. Selecciona la consulta más reciente para editar o crea una nueva.</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => switchVisit(allVisits[0].id)}
+                                className="px-4 py-2 bg-amber-600 text-white rounded-xl text-[10px] font-black hover:bg-amber-700 transition-all"
+                            >
+                                Ir a actual
+                            </button>
+                            <button
+                                onClick={() => setShowNewVisitModal(true)}
+                                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black hover:bg-black transition-all"
+                            >
+                                + Nueva consulta
+                            </button>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 rounded-md bg-[#2563EB] shadow-sm" />
-                        <span className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Sano / Buen Estado</span>
+                )}
+
+                {/* New Visit Modal */}
+                <AnimatePresence>
+                    {showNewVisitModal && (
+                        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.97 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.97 }}
+                                className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 space-y-6 mx-4"
+                            >
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-800">Nueva Consulta</h2>
+                                    <p className="text-[11px] text-slate-400 mt-1">Se creará un nuevo odontograma en blanco para esta visita. El anterior quedará guardado como consulta histórica.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Notas de la sesión (opcional)</label>
+                                    <textarea
+                                        value={newVisitNotes}
+                                        onChange={e => setNewVisitNotes(e.target.value)}
+                                        placeholder="Ej: Control post-operatorio, revisión rutinaria..."
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none h-28"
+                                    />
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowNewVisitModal(false)}
+                                        className="flex-1 py-3 border border-slate-200 rounded-xl text-[11px] font-black text-slate-500 hover:bg-slate-50 transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleCreateNewVisit}
+                                        disabled={creatingVisit}
+                                        className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[11px] font-black hover:bg-black transition-all disabled:opacity-50"
+                                    >
+                                        {creatingVisit ? 'Creando...' : '✓ Crear nueva consulta'}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+
+                {/* ── Sub Header: Legend & Actions ── */}
+                <div className="flex items-center justify-between mb-8 px-4">
+                    <div className="flex items-center gap-8">
+                        <div className="flex items-center gap-2">
+                            <div className="h-4 w-4 rounded-md bg-[#DC2626] shadow-sm" />
+                            <span className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Patología / Mal Estado</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="h-4 w-4 rounded-md bg-[#2563EB] shadow-sm" />
+                            <span className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Sano / Buen Estado</span>
+                        </div>
                     </div>
-                </div>
 
-                <div className="flex gap-3">
-                    <button
-                        onClick={handleOpenBudgetPreview}
-                        disabled={isReadOnlyVisit}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 border border-emerald-700 rounded-xl text-[12px] font-black text-white hover:bg-emerald-700 transition-all shadow-md shadow-emerald-500/20 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                        <DollarSign size={16} /> GENERAR PRESUPUESTO
-                    </button>
-                    <button
-                        onClick={handleExportPDF}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[12px] font-black text-white hover:bg-black transition-all shadow-md active:scale-95"
-                    >
-                        <ClipboardList size={16} /> EXPORTAR PDF (OFICIAL)
-                    </button>
-                    <button
-                        onClick={() => {
-                            if (window.confirm('¿Deseas limpiar todos los hallazgos? Esta acción es irreversible.')) {
-                                resetOdontogram();
-                            }
-                        }}
-                        className="p-2.5 text-red-500 bg-white border border-red-100 rounded-xl hover:bg-red-50 transition-all shadow-sm"
-                    >
-                        <Trash2 size={18} />
-                    </button>
-                </div>
-            </div>
-
-            {/* ── Dental Chart (Integrated Mixed Dentition) ── */}
-            <div className="flex flex-col items-center gap-1 overflow-x-auto py-12 px-10 bg-white rounded-[40px] border border-slate-100 shadow-xl min-w-fit mb-12">
-                {/* Permanent Upper Row (18-11 | 21-28) */}
-                <div className="flex gap-2 mb-4">
-                    <div className="flex gap-1.5 pr-6 border-r-2 border-slate-100">{renderRow(UPPER_RIGHT, true)}</div>
-                    <div className="flex gap-1.5 pl-6">{renderRow(UPPER_LEFT, true)}</div>
-                </div>
-
-                {/* Primary Upper Row (55-51 | 61-65) */}
-                <div className="flex gap-2 mb-16">
-                    <div className="flex gap-1 pr-6 border-r-2 border-slate-100">{renderRow(PRIMARY_UPPER_RIGHT, true)}</div>
-                    <div className="flex gap-1 pl-6">{renderRow(PRIMARY_UPPER_LEFT, true)}</div>
-                </div>
-
-                {/* Primary Lower Row (85-81 | 71-75) */}
-                <div className="flex gap-2 mb-4">
-                    <div className="flex gap-1 pr-6 border-r-2 border-slate-100">{renderRow(PRIMARY_LOWER_RIGHT, false)}</div>
-                    <div className="flex gap-1 pl-6">{renderRow(PRIMARY_LOWER_LEFT, false)}</div>
-                </div>
-
-                {/* Permanent Lower Row (48-41 | 31-38) */}
-                <div className="flex gap-2">
-                    <div className="flex gap-1.5 pr-6 border-r-2 border-slate-100">{renderRow(LOWER_RIGHT, false)}</div>
-                    <div className="flex gap-1.5 pl-6">{renderRow(LOWER_LEFT, false)}</div>
-                </div>
-            </div>
-
-            {/* ── Official Footer: Specifications & Observations ── */}
-            <div className="grid grid-cols-2 gap-8 mb-12">
-                <div className="space-y-3">
-                    <label className="text-[12px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
-                        <Activity size={14} className="text-blue-600" /> ESPECIFICACIONES
-                    </label>
-                    <textarea
-                        value={globalSpecifications}
-                        onChange={(e) => setGlobalSpecifications(e.target.value)}
-                        className="w-full h-32 p-4 bg-white border border-slate-200 rounded-2xl text-[13px] text-slate-600 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm resize-none"
-                        placeholder="Detalle aquí hallazgos generalizados como Fluorosis, etc."
-                    />
-                </div>
-                <div className="space-y-3">
-                    <label className="text-[12px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
-                        <Info size={14} className="text-blue-600" /> OBSERVACIONES
-                    </label>
-                    <textarea
-                        value={globalObservations}
-                        onChange={(e) => setGlobalObservations(e.target.value)}
-                        className="w-full h-32 p-4 bg-white border border-slate-200 rounded-2xl text-[13px] text-slate-600 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm resize-none"
-                        placeholder="Observaciones clínicas adicionales..."
-                    />
-                </div>
-            </div>
-
-            {/* ── Treatment Plan Table ── */}
-            <div className="mt-12">
-                <h3 className="text-[18px] font-bold text-slate-700 mb-4">Plan de tratamiento</h3>
-                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-[#334e68] text-white">
-                            <tr>
-                                <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">N° diente</th>
-                                <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">Hallazgo / Estado</th>
-                                <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">Servicios / Pago</th>
-                                <th className="px-6 py-4 text-[13px] font-bold">Nota</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white">
-                            {tableData.length > 0 ? tableData.map((item, idx) => {
-                                const cond = getConditionData(item.cond);
-                                return (
-                                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-3 text-[12px] font-bold text-slate-600">{item.n} {item.surface ? `(${item.surface})` : ''}</td>
-                                        <td className="px-6 py-3">
-                                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider" style={{ backgroundColor: cond?.bg, color: cond?.color }}>
-                                                {cond?.label || item.cond}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-3 text-[12px] font-medium text-slate-500">
-                                            {item.cond === 'CURADO' ? (
-                                                <div className="flex items-center gap-3">
-                                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[9px] font-black uppercase">Por cobrar</span>
-                                                    <button
-                                                        onClick={() => navigate(`/expediente/${patientId}/budgets`)}
-                                                        className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-bold hover:bg-slate-800 transition-all flex items-center gap-1"
-                                                    >
-                                                        <Activity size={12} /> Facturar
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                '—'
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-3 text-[12px] font-medium text-slate-500 italic">{item.notes || 'Sin nota'}</td>
-                                    </tr>
-                                );
-                            }) : (
-                                <tr>
-                                    <td colSpan="4" className="px-6 py-20 text-center">
-                                        <div className="flex flex-col items-center gap-2 opacity-30">
-                                            <ClipboardList size={40} className="text-slate-400" />
-                                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No hay hallazgos registrados</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Float Save Button */}
-            {
-                dirty && (
-                    <div className="fixed bottom-8 right-8 z-[50]">
+                    <div className="flex gap-3">
                         <button
-                            onClick={async (e) => {
-                                e.stopPropagation();
-                                await handleSave();
+                            onClick={handleOpenBudgetPreview}
+                            disabled={isReadOnlyVisit}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 border border-emerald-700 rounded-xl text-[12px] font-black text-white hover:bg-emerald-700 transition-all shadow-md shadow-emerald-500/20 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            <DollarSign size={16} /> GENERAR PRESUPUESTO
+                        </button>
+                        <button
+                            onClick={handleExportPDF}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[12px] font-black text-white hover:bg-black transition-all shadow-md active:scale-95"
+                        >
+                            <ClipboardList size={16} /> EXPORTAR PDF (OFICIAL)
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (window.confirm('¿Deseas limpiar todos los hallazgos? Esta acción es irreversible.')) {
+                                    resetOdontogram();
+                                }
                             }}
-                            disabled={saving}
-                            className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl shadow-2xl hover:bg-blue-700 transition-all active:scale-95 font-black uppercase text-[12px] tracking-widest">
-                            {saving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}
+                            className="p-2.5 text-red-500 bg-white border border-red-100 rounded-xl hover:bg-red-50 transition-all shadow-sm"
+                        >
+                            <Trash2 size={18} />
                         </button>
                     </div>
-                )
-            }
-        </div>
+                </div>
 
-        {/* ── Budget Preview Modal ── */}
-        {showBudgetModal && (
-            <BudgetPreviewModal
-                initialItems={previewItems}
-                patientId={patientId}
-                doctorId={user?.id}
-                onClose={() => setShowBudgetModal(false)}
-                onSuccess={() => {
-                    setShowBudgetModal(false);
-                    navigate(`/expediente/${patientId}/budgets`);
-                }}
-            />
-        )}
+                {/* ── Dental Chart (Integrated Mixed Dentition) ── */}
+                <div className="flex flex-col items-center gap-1 overflow-x-auto py-12 px-10 bg-white rounded-[40px] border border-slate-100 shadow-xl min-w-fit mb-12">
+                    {/* Permanent Upper Row (18-11 | 21-28) */}
+                    <div className="flex gap-2 mb-4">
+                        <div className="flex gap-1.5 pr-6 border-r-2 border-slate-100">{renderRow(UPPER_RIGHT, true)}</div>
+                        <div className="flex gap-1.5 pl-6">{renderRow(UPPER_LEFT, true)}</div>
+                    </div>
+
+                    {/* Primary Upper Row (55-51 | 61-65) */}
+                    <div className="flex gap-2 mb-16">
+                        <div className="flex gap-1 pr-6 border-r-2 border-slate-100">{renderRow(PRIMARY_UPPER_RIGHT, true)}</div>
+                        <div className="flex gap-1 pl-6">{renderRow(PRIMARY_UPPER_LEFT, true)}</div>
+                    </div>
+
+                    {/* Primary Lower Row (85-81 | 71-75) */}
+                    <div className="flex gap-2 mb-4">
+                        <div className="flex gap-1 pr-6 border-r-2 border-slate-100">{renderRow(PRIMARY_LOWER_RIGHT, false)}</div>
+                        <div className="flex gap-1 pl-6">{renderRow(PRIMARY_LOWER_LEFT, false)}</div>
+                    </div>
+
+                    {/* Permanent Lower Row (48-41 | 31-38) */}
+                    <div className="flex gap-2">
+                        <div className="flex gap-1.5 pr-6 border-r-2 border-slate-100">{renderRow(LOWER_RIGHT, false)}</div>
+                        <div className="flex gap-1.5 pl-6">{renderRow(LOWER_LEFT, false)}</div>
+                    </div>
+                </div>
+
+                {/* ── Official Footer: Specifications & Observations ── */}
+                <div className="grid grid-cols-2 gap-8 mb-12">
+                    <div className="space-y-3">
+                        <label className="text-[12px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                            <Activity size={14} className="text-blue-600" /> ESPECIFICACIONES
+                        </label>
+                        <textarea
+                            value={globalSpecifications}
+                            onChange={(e) => setGlobalSpecifications(e.target.value)}
+                            className="w-full h-32 p-4 bg-white border border-slate-200 rounded-2xl text-[13px] text-slate-600 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm resize-none"
+                            placeholder="Detalle aquí hallazgos generalizados como Fluorosis, etc."
+                        />
+                    </div>
+                    <div className="space-y-3">
+                        <label className="text-[12px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                            <Info size={14} className="text-blue-600" /> OBSERVACIONES
+                        </label>
+                        <textarea
+                            value={globalObservations}
+                            onChange={(e) => setGlobalObservations(e.target.value)}
+                            className="w-full h-32 p-4 bg-white border border-slate-200 rounded-2xl text-[13px] text-slate-600 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm resize-none"
+                            placeholder="Observaciones clínicas adicionales..."
+                        />
+                    </div>
+                </div>
+
+                {/* ── Treatment Plan Table ── */}
+                <div className="mt-12">
+                    <h3 className="text-[18px] font-bold text-slate-700 mb-4">Plan de tratamiento</h3>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-[#334e68] text-white">
+                                <tr>
+                                    <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">N° diente</th>
+                                    <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">Hallazgo / Estado</th>
+                                    <th className="px-6 py-4 text-[13px] font-bold border-r border-slate-600">Servicios / Pago</th>
+                                    <th className="px-6 py-4 text-[13px] font-bold">Nota</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white">
+                                {tableData.length > 0 ? tableData.map((item, idx) => {
+                                    const cond = getConditionData(item.cond);
+                                    return (
+                                        <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-3 text-[12px] font-bold text-slate-600">{item.n} {item.surface ? `(${item.surface})` : ''}</td>
+                                            <td className="px-6 py-3">
+                                                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider" style={{ backgroundColor: cond?.bg, color: cond?.color }}>
+                                                    {cond?.label || item.cond}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-3 text-[12px] font-medium text-slate-500">
+                                                {item.cond === 'CURADO' ? (
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[9px] font-black uppercase">Por cobrar</span>
+                                                        <button
+                                                            onClick={() => navigate(`/expediente/${patientId}/budgets`)}
+                                                            className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-bold hover:bg-slate-800 transition-all flex items-center gap-1"
+                                                        >
+                                                            <Activity size={12} /> Facturar
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-3 text-[12px] font-medium text-slate-500 italic">{item.notes || 'Sin nota'}</td>
+                                        </tr>
+                                    );
+                                }) : (
+                                    <tr>
+                                        <td colSpan="4" className="px-6 py-20 text-center">
+                                            <div className="flex flex-col items-center gap-2 opacity-30">
+                                                <ClipboardList size={40} className="text-slate-400" />
+                                                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No hay hallazgos registrados</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Float Save Button */}
+                {
+                    dirty && (
+                        <div className="fixed bottom-8 right-8 z-[50]">
+                            <button
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await handleSave();
+                                }}
+                                disabled={saving}
+                                className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl shadow-2xl hover:bg-blue-700 transition-all active:scale-95 font-black uppercase text-[12px] tracking-widest">
+                                {saving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}
+                            </button>
+                        </div>
+                    )
+                }
+            </div>
+
+            {/* ── Budget Preview Modal ── */}
+            {showBudgetModal && (
+                <BudgetPreviewModal
+                    initialItems={previewItems}
+                    patientId={patientId}
+                    doctorId={user?.id}
+                    onClose={() => setShowBudgetModal(false)}
+                    onSuccess={() => {
+                        setShowBudgetModal(false);
+                        navigate(`/expediente/${patientId}/budgets`);
+                    }}
+                />
+            )}
         </>
     );
 };

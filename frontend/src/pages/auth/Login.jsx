@@ -38,8 +38,8 @@ const Login = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden font-sans">
             {/* Animated Background Elements */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-200/20 rounded-full blur-[120px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-200/20 rounded-full blur-[120px] animate-pulse delay-1000"></div>
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal/10 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-mint/10 rounded-full blur-[120px] animate-pulse delay-1000"></div>
 
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -58,11 +58,17 @@ const Login = () => {
                             transition={{ delay: 0.3 }}
                             className="flex items-center gap-3 mb-12"
                         >
-                            <div className="h-12 w-12 bg-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/40">
-                                <Stethoscope size={28} />
+                            <div className="h-12 w-12 bg-teal rounded-2xl flex items-center justify-center shadow-lg shadow-teal/40">
+                                <svg viewBox="0 0 100 100" className="w-8 h-8 fill-none stroke-white stroke-[6]">
+                                    <path d="M50 85C40 85 20 75 20 50C20 25 35 15 50 15C65 15 80 25 80 50C80 75 60 85 50 85Z" className="stroke-mint/30" />
+                                    <path d="M45 25C35 25 25 35 25 50C25 65 35 75 45 75C55 75 70 65 70 50C70 35 55 25 45 25Z" className="fill-mint" />
+                                    <circle cx="50" cy="50" r="10" className="fill-teal" />
+                                </svg>
                             </div>
-                            <div className="font-black text-2xl tracking-tight">
-                                SGD <span className="text-cyan-400 font-medium">Dental</span>
+                            <div className="font-black text-3xl tracking-tighter flex items-baseline gap-0.5">
+                                <span className="text-teal-400">D</span>
+                                <span>ently</span>
+                                <span className="h-2 w-2 rounded-full bg-mint ml-1" />
                             </div>
                         </motion.div>
 
@@ -72,7 +78,7 @@ const Login = () => {
                             transition={{ delay: 0.5 }}
                         >
                             <h2 className="text-4xl md:text-5xl font-black mb-6 leading-[1.1] tracking-tight">
-                                Gestión de <br /> <span className="text-cyan-400">Próxima Generación.</span>
+                                Gestión de <br /> <span className="text-mint">Próxima Generación.</span>
                             </h2>
                             <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-[280px]">
                                 El estándar de oro para consultorios dentales modernos.
@@ -101,7 +107,7 @@ const Login = () => {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.6 }}
-                            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 text-cyan-700 text-[10px] font-black uppercase tracking-widest mb-4 border border-cyan-100/50"
+                            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal/10 text-teal-700 text-[10px] font-black uppercase tracking-widest mb-4 border border-teal-100/50"
                         >
                             <Sparkles size={12} /> Acceso Restringido
                         </motion.span>
@@ -132,7 +138,7 @@ const Login = () => {
                                     type="email"
                                     required
                                     autoFocus
-                                    className="w-full pl-12 pr-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-cyan-500/10 focus:border-cyan-500 text-[15px] font-medium text-slate-700 transition-all placeholder:text-slate-400 shadow-sm"
+                                    className="w-full pl-12 pr-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-teal/10 focus:border-teal text-[15px] font-medium text-slate-700 transition-all placeholder:text-slate-400 shadow-sm"
                                     placeholder="admin@dental.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -143,14 +149,14 @@ const Login = () => {
                         <div className="space-y-2">
                             <div className="flex justify-between items-center px-1">
                                 <label className="text-[13px] font-black text-slate-700 uppercase tracking-wider">Contraseña</label>
-                                <button type="button" className="text-[11px] font-bold text-cyan-600 hover:text-cyan-700 transition-colors">Olvidé mi contraseña</button>
+                                <button type="button" className="text-[11px] font-bold text-teal hover:text-teal/80 transition-colors">Olvidé mi contraseña</button>
                             </div>
                             <div className="relative group">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-cyan-600 transition-colors" size={20} />
                                 <input
                                     type="password"
                                     required
-                                    className="w-full pl-12 pr-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-cyan-500/10 focus:border-cyan-500 text-[15px] font-medium text-slate-700 transition-all placeholder:text-slate-400 shadow-sm"
+                                    className="w-full pl-12 pr-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-teal/10 focus:border-teal text-[15px] font-medium text-slate-700 transition-all placeholder:text-slate-400 shadow-sm"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -173,14 +179,14 @@ const Login = () => {
                                     </>
                                 )}
                             </span>
-                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-teal to-teal/80 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         </button>
                     </form>
 
                     {/* Registro */}
                     <p className="mt-6 text-center text-sm text-slate-500 font-medium">
                         ¿No tienes cuenta?{' '}
-                        <Link to="/register" className="text-cyan-600 font-black hover:text-cyan-700 transition-colors">
+                        <Link to="/register" className="text-teal font-black hover:text-teal/80 transition-colors">
                             Registra tu clínica gratis
                         </Link>
                     </p>
@@ -201,7 +207,7 @@ const Login = () => {
             {/* Float Decoration */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-7xl max-h-[800px] pointer-events-none opacity-20">
                 <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="absolute top-0 right-0 w-96 h-96 blur-3xl">
-                    <path fill="#06B6D4" d="M47.5,-52.2C60.7,-41.8,69.9,-25.9,71.2,-9.2C72.5,7.5,65.8,25.1,54.7,38.9C43.5,52.8,27.8,62.9,11.2,65.8C-5.5,68.7,-23.1,64.4,-38.3,55.1C-53.5,45.8,-66.3,31.4,-70.5,14.6C-74.8,-2.2,-70.5,-21.5,-59.7,-34.5C-48.9,-47.5,-31.6,-54.2,-15.1,-58.3C1.4,-62.4,18.8,-63.9,34.4,-59.8" transform="translate(100 100)" />
+                    <path fill="#00484d" d="M47.5,-52.2C60.7,-41.8,69.9,-25.9,71.2,-9.2C72.5,7.5,65.8,25.1,54.7,38.9C43.5,52.8,27.8,62.9,11.2,65.8C-5.5,68.7,-23.1,64.4,-38.3,55.1C-53.5,45.8,-66.3,31.4,-70.5,14.6C-74.8,-2.2,-70.5,-21.5,-59.7,-34.5C-48.9,-47.5,-31.6,-54.2,-15.1,-58.3C1.4,-62.4,18.8,-63.9,34.4,-59.8" transform="translate(100 100)" />
                 </svg>
             </div>
         </div>
