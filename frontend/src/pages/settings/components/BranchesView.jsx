@@ -26,7 +26,7 @@ const BranchesView = ({ onRefresh }) => {
         try {
             const res = await api.get('branches');
             setBranches(res.data);
-            if (onRefresh) onRefresh();
+            // No llamar a onRefresh aquí durante el montaje inicial para evitar bucle infinito con Settings.jsx
         } catch (error) {
             console.error('Error fetching branches:', error);
         } finally {
@@ -44,7 +44,8 @@ const BranchesView = ({ onRefresh }) => {
                 await api.post('branches', form);
             }
             setShowModal(false);
-            fetchData();
+            fetchBranches();
+            if (onRefresh) onRefresh(); // Notificar a los padres solo cuando hay un cambio real
         } catch (error) {
             const msg = error.response?.data?.detail || error.response?.data?.message || error.message;
             alert('Error al guardar sede: ' + msg);
@@ -58,7 +59,8 @@ const BranchesView = ({ onRefresh }) => {
         if (!window.confirm(`¿Está seguro de ${action} este registro?`)) return;
         try {
             await api.put(`branches/${item.id}`, { ...item, active: !item.active });
-            fetchData();
+            fetchBranches();
+            if (onRefresh) onRefresh();
         } catch (error) {
             const msg = error.response?.data?.message || error.message;
             alert(`Error al ${action}: ` + msg);
