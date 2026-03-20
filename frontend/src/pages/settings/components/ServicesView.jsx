@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Power, X, Stethoscope, Tag, Clock, DollarSign, Loader2, CheckCircle } from 'lucide-react';
+import { Plus, Edit2, Power, X, Stethoscope, Tag, Clock, DollarSign, Loader2, CheckCircle, FlaskConical } from 'lucide-react';
 import api from '../../../services/api';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import RecipeModal from './RecipeModal';
 
 const cn = (...inputs) => twMerge(clsx(inputs));
 
@@ -37,6 +38,7 @@ const ServicesView = () => {
     const [form, setForm] = useState(emptyForm);
     const [filterCategory, setFilterCategory] = useState('ALL');
     const [saving, setSaving] = useState(false);
+    const [recipeService, setRecipeService] = useState(null); // { id, name }
 
     const fetchServices = async () => {
         setLoading(true);
@@ -146,6 +148,10 @@ const ServicesView = () => {
                                 {service.category}
                             </span>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => setRecipeService({ id: service.id, name: service.name })} title="Configurar Receta"
+                                    className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-purple-600 hover:border-purple-200 transition-all shadow-sm">
+                                    <FlaskConical size={13} />
+                                </button>
                                 <button onClick={() => openModal(service)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-cyan-600 hover:border-cyan-200 transition-all shadow-sm">
                                     <Edit2 size={13} />
                                 </button>
@@ -224,6 +230,13 @@ const ServicesView = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Recipe Modal */}
+            <RecipeModal
+                open={!!recipeService}
+                onClose={() => setRecipeService(null)}
+                service={recipeService}
+            />
         </div>
     );
 };

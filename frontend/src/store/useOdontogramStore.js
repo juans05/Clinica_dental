@@ -251,9 +251,17 @@ const useOdontogramStore = create((set, get) => ({
             const isRange = RANGE_FINDINGS.includes(id);
 
             if (currentIdx > -1) {
-                // Remover
-                t.conditions = t.conditions.filter(id => id !== toolToApply);
+                // REMOVER (si ya existe el hallazgo exacto)
+                t.conditions = t.conditions.filter(c => c !== toolToApply);
                 newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'REMOVE', description: `Retiró condición ${toolToApply}` });
+
+                if (isRange) {
+                    // Limpiar también cualquier línea o rastro del rango en ESTA pieza
+                    t.conditions = t.conditions.filter(c => !c.startsWith(`${id}:`) && !c.startsWith(`${id}_L:`));
+                    newTeeth[n] = t;
+                    syncRangeArch(newTeeth, n, colorState, id);
+                    return { teeth: newTeeth, dirty: true, selected: n, pendingLogs: newLogs };
+                }
 
                 // Si es bidireccional, remover recíproco
                 if (isBidirectional) {
@@ -265,25 +273,18 @@ const useOdontogramStore = create((set, get) => ({
                         newTeeth[pNum] = pt;
                     }
                 }
-
+            } else {
+                // AÑADIR (si no existe)
                 if (isRange) {
-                    // Toggle explicit anchor
                     const baseId = `${id}:${colorState}`;
-                    const hasAnyAnchor = t.conditions.some(c => c.startsWith(`${id}:`));
-
-                    if (hasAnyAnchor) {
-                        t.conditions = t.conditions.filter(c => !c.startsWith(`${id}:`) && !c.startsWith(`${id}_L:`));
-                    } else {
-                        t.conditions = [...t.conditions, `${baseId}:ANCHOR`];
-                    }
+                    // Al añadir un anclaje de rango, nos aseguramos de que sea el único de ese tipo en la pieza
+                    t.conditions = [...t.conditions.filter(c => !c.startsWith(`${id}:`)), `${baseId}:ANCHOR`];
                     newTeeth[n] = t;
-
                     syncRangeArch(newTeeth, n, colorState, id);
-
+                    newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'ADD', description: `Añadió anclaje ${id}` });
                     return { teeth: newTeeth, dirty: true, selected: n, pendingLogs: newLogs };
                 }
-            } else {
-                // Añadir
+
                 t.conditions = [...t.conditions, toolToApply];
                 newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'ADD', description: `Añadió condición ${toolToApply}` });
 
@@ -298,16 +299,6 @@ const useOdontogramStore = create((set, get) => ({
                         }
                         newTeeth[pNum] = pt;
                     }
-                }
-
-                if (isRange) {
-                    const baseId = `${id}:${colorState}`;
-                    t.conditions = [...t.conditions.filter(c => !c.startsWith(`${id}:`)), `${baseId}:ANCHOR`];
-                    newTeeth[n] = t;
-
-                    syncRangeArch(newTeeth, n, colorState, id);
-
-                    return { teeth: newTeeth, dirty: true, selected: n, pendingLogs: newLogs };
                 }
             }
 
@@ -324,32 +315,130 @@ const useOdontogramStore = create((set, get) => ({
     markSurface: (n, s, findingId = null) => {
         const { activeTool } = get();
         const toolToApply = findingId || activeTool;
-        if (typeof toolToApply !== 'string') return;
-
+        
         set((state) => {
             const t = { ...state.teeth[n] };
-            const currentArr = t.surfaces[s] || [];
-            const currentIdx = currentArr.indexOf(toolToApply);
+            if (!t.surfaces) t.surfaces = { O: [], V: [], L: [], M: [], D: [] };
+            
+            const currentArr = [...(t.surfaces[s] || [])];
             const newLogs = [...state.pendingLogs];
 
             let newArr;
-            if (currentIdx > -1) {
-                newArr = currentArr.filter(id => id !== toolToApply);
-                newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'REMOVE', description: `Retiró ${toolToApply} de superficie ${s}` });
+
+            if (!toolToApply || typeof toolToApply !== 'string') {
+                // Si no hay herramienta, pero la superficie tiene algo, quitamos el último (para facilitar deselección)
+                if (currentArr.length > 0) {
+                    const removed = currentArr.pop();
+                    newArr = currentArr;
+                    newLogs.push({ toothNumber: n, conditionId: removed, action: 'REMOVE', description: `Saca ${removed} de ${s} (auto)` });
+                } else {
+                    return state;
+                }
             } else {
-                newArr = [...currentArr, toolToApply];
-                newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'ADD', description: `Añadió ${toolToApply} en superficie ${s}` });
+                const [baseId] = toolToApply.split(':');
+                const existingIdx = currentArr.findIndex(id => id.startsWith(`${baseId}:`));
+
+                if (existingIdx > -1) {
+                    if (currentArr[existingIdx] === toolToApply) {
+                        newArr = currentArr.filter((_, i) => i !== existingIdx);
+                        newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'REMOVE', description: `Retiró ${toolToApply} de ${s}` });
+                    } else {
+                        newArr = [...currentArr];
+                        newArr[existingIdx] = toolToApply;
+                        newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'UPDATE', description: `Cambió estado de ${baseId} en ${s}` });
+                    }
+                } else {
+                    newArr = [...currentArr, toolToApply];
+                    newLogs.push({ toothNumber: n, conditionId: toolToApply, action: 'ADD', description: `Añadió ${toolToApply} a ${s}` });
+                }
             }
 
-            t.surfaces = {
-                ...t.surfaces,
-                [s]: newArr
+            t.surfaces[s] = newArr;
+            return {
+                teeth: { ...state.teeth, [n]: t },
+                dirty: true,
+                pendingLogs: newLogs
             };
+        });
+    },
+
+    removeFindingFromTooth: (n, findingId) => {
+        set((state) => {
+            const newTeeth = { ...state.teeth };
+            const t = { ...newTeeth[n] };
+            const [baseId, , partner] = findingId.split(':');
+            const newLogs = [...state.pendingLogs];
+
+            // Quitar de condiciones de diente
+            if (t.conditions) {
+                t.conditions = t.conditions.filter(c => !c.startsWith(`${baseId}:`) && c !== baseId);
+            }
+
+            // Quitar de superficies
+            if (t.surfaces) {
+                const newSurfaces = { ...t.surfaces };
+                Object.keys(newSurfaces).forEach(s => {
+                    newSurfaces[s] = (newSurfaces[s] || []).filter(c => {
+                        if (typeof c !== 'string') return false;
+                        const [cBaseId] = c.split(':');
+                        return cBaseId !== baseId;
+                    });
+                });
+                t.surfaces = newSurfaces;
+            }
+
+            // Si es bidireccional (Fusión o Transposición), eliminar recíproco
+            if ((baseId === 'FUS' || baseId === 'TRA') && partner) {
+                const pNum = parseInt(partner);
+                if (newTeeth[pNum]) {
+                    const pt = { ...newTeeth[pNum] };
+                    // El recíproco es aquel que empieza por baseId y contiene la pieza n como partner
+                    pt.conditions = pt.conditions.filter(c => !(c.startsWith(`${baseId}:`) && c.endsWith(`:${n}`)));
+                    newTeeth[pNum] = pt;
+                }
+            }
+
+            newLogs.push({ toothNumber: n, conditionId: findingId, action: 'REMOVE_ALL', description: `Eliminó todas las instancias de ${baseId}` });
+
+            newTeeth[n] = t;
+            return {
+                teeth: newTeeth,
+                dirty: true,
+                pendingLogs: newLogs
+            };
+        });
+    },
+
+    updateFindingState: (n, baseId, newState) => {
+        set((state) => {
+            const t = { ...state.teeth[n] };
+            const newLogs = [...state.pendingLogs];
+
+            // Actualizar en condiciones de diente
+            if (t.conditions) {
+                t.conditions = t.conditions.map(c => {
+                    if (c.startsWith(`${baseId}:`)) return `${baseId}:${newState}`;
+                    return c;
+                });
+            }
+
+            // Actualizar en superficies
+            if (t.surfaces) {
+                const newSurfaces = { ...t.surfaces };
+                Object.keys(newSurfaces).forEach(s => {
+                    newSurfaces[s] = (newSurfaces[s] || []).map(c => {
+                        if (c.startsWith(`${baseId}:`)) return `${baseId}:${newState}`;
+                        return c;
+                    });
+                });
+                t.surfaces = newSurfaces;
+            }
+
+            newLogs.push({ toothNumber: n, conditionId: baseId, action: 'UPDATE_STATE', description: `Cambiando estado de ${baseId} a ${newState}` });
 
             return {
                 teeth: { ...state.teeth, [n]: t },
                 dirty: true,
-                selected: n,
                 pendingLogs: newLogs
             };
         });

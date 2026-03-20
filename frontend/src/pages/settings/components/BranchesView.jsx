@@ -32,11 +32,11 @@ const BranchesView = ({ onRefresh }) => {
         } finally {
             setLoading(false);
         }
-    };
+                                                                                                                                                                                                                                                                                                                                                                                    };
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-        setSaving(true);
+                                                                                                                                                                                                                                                                                                                                                                                    const handleSave = async (e) => {
+                                                                                                                                                                                                                                                                                                                                                                                        e.preventDefault();
+                                                                                                                                                                                                                                                                                                                                                                                        setSaving(true);
         try {
             if (editingItem) {
                 await api.put(`branches/${editingItem.id}`, form);

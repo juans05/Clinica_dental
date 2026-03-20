@@ -483,10 +483,28 @@ const BudgetModule = ({ patientId, patientName }) => {
                                             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total</p><p className="text-lg font-black text-slate-800">S/ {total.toFixed(2)}</p></div>
                                             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm border-l-4 border-l-emerald-400"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pagado</p><p className="text-lg font-black text-emerald-600">S/ {paid.toFixed(2)}</p></div>
                                             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm border-l-4 border-l-indigo-400"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Por Pagar</p><p className="text-lg font-black text-indigo-600">S/ {balance.toFixed(2)}</p></div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => handleExportPDF(budget, 'print')} className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center hover:bg-slate-50 text-slate-600 transition-all"><Printer size={16} /><span className="text-[8px] font-black uppercase mt-1">Imprimir</span></button>
-                                                <button onClick={() => handleExportPDF(budget, 'download')} className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center hover:bg-slate-50 text-slate-600 transition-all"><Download size={16} /><span className="text-[8px] font-black uppercase mt-1">PDF</span></button>
-                                            </div>
+                                            {!budget.branch ? (
+                                                <button 
+                                                    onClick={async () => {
+                                                        const res = await useBudgetStore.getState().updateTreatmentPlan(budget.id, {});
+                                                        if (res) {
+                                                            await fetchBudgets(patientId);
+                                                            alert('Sede asignada correctamente.');
+                                                        } else {
+                                                            alert('Error al asignar sede. Verifique su conexión.');
+                                                        }
+                                                    }}
+                                                    className="flex-1 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col items-center justify-center hover:bg-amber-100 text-amber-700 transition-all font-black"
+                                                >
+                                                    <AlertCircle size={16} />
+                                                    <span className="text-[8px] font-black uppercase mt-1">Asignar Sede</span>
+                                                </button>
+                                            ) : (
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleExportPDF(budget, 'print')} className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center hover:bg-slate-50 text-slate-600 transition-all"><Printer size={16} /><span className="text-[8px] font-black uppercase mt-1">Imprimir</span></button>
+                                                    <button onClick={() => handleExportPDF(budget, 'download')} className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center hover:bg-slate-50 text-slate-600 transition-all"><Download size={16} /><span className="text-[8px] font-black uppercase mt-1">PDF</span></button>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                                             <table className="w-full text-left">

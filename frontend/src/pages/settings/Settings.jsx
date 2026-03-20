@@ -18,7 +18,8 @@ import {
     Building2,
     Stethoscope,
     Activity,
-    FileText
+    FileText,
+    Package
 } from 'lucide-react';
 import api from '../../services/api';
 import UsersView from './UsersView';
@@ -27,6 +28,7 @@ import ServicesView from './components/ServicesView';
 import ConsultoriesView from './components/ConsultoriesView';
 import SchedulePanel from './components/SchedulePanel';
 import SeriesPanel from './components/SeriesPanel';
+import InventoryView from './InventoryView';
 
 const Settings = () => {
     const [activeTab, setActiveTab] = useState('PROFILE');
@@ -114,6 +116,7 @@ const Settings = () => {
         { id: 'BRANCHES', icon: Building2, label: 'Sedes' },
         { id: 'USERS', icon: Shield, label: 'Usuarios' },
         { id: 'SERVICES', icon: Stethoscope, label: 'Servicios' },
+        { id: 'INVENTORY', icon: Package, label: 'Inventario' },
         { id: 'CONSULTORIES', icon: Activity, label: 'Consultorios' },
         { id: 'SCHEDULES', icon: Clock, label: 'Horarios' },
         { id: 'SERIES', icon: FileText, label: 'Series' },
@@ -324,6 +327,10 @@ const Settings = () => {
 
                     {activeTab === 'SERIES' && (
                         <SeriesPanel branches={branches} />
+                    )}
+
+                    {activeTab === 'INVENTORY' && (
+                        <InventoryView />
                     )}
 
                     {['SUBSCRIPTION', 'INTEGRATIONS'].includes(activeTab) && (

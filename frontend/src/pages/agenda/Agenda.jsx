@@ -712,7 +712,6 @@ const Agenda = () => {
                                         value={formData.consultoryId}
                                         onChange={e => setFormData({ ...formData, consultoryId: e.target.value })}
                                         className="premium-input bg-slate-50/50"
-                                        required
                                     >
                                         <option value="">Seleccionar Sillón...</option>
                                         {consultories

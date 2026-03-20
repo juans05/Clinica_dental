@@ -20,6 +20,7 @@ const UsersView = ({ branches: propBranches, profiles: propProfiles, onRefresh }
     const [showModal, setShowModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -44,12 +45,16 @@ const UsersView = ({ branches: propBranches, profiles: propProfiles, onRefresh }
 
             // If props are not provided, fetch them as fallback
             if (!propProfiles || !propBranches) {
-                const [pRes, bRes] = await Promise.all([
+                const [pRes, bRes] = await Promise.allSettled([
                     api.get('profiles'),
                     api.get('branches')
                 ]);
-                setProfiles(pRes.data);
-                setBranches(bRes.data);
+                
+                if (pRes.status === 'fulfilled') setProfiles(pRes.value.data);
+                else console.error('Error fetching profiles:', pRes.reason);
+                
+                if (bRes.status === 'fulfilled') setBranches(bRes.value.data);
+                else console.error('Error fetching branches:', bRes.reason);
             }
         } catch (error) {
             console.error('Error fetching users data:', error);
@@ -84,6 +89,7 @@ const UsersView = ({ branches: propBranches, profiles: propProfiles, onRefresh }
                 profileId: ''
             });
         }
+        setError(null);
         setShowModal(true);
     };
 
@@ -98,12 +104,14 @@ const UsersView = ({ branches: propBranches, profiles: propProfiles, onRefresh }
             } else {
                 await api.post('auth/register', { ...formData, companyId: currentUser.companyId });
             }
-            handleCloseModal();
+            setShowModal(false);
             fetchData();
             if (onRefresh) onRefresh();
         } catch (error) {
+            console.error('Error saving user:', error);
             const msg = error.response?.data?.message || error.message;
-            alert('Error al guardar usuario: ' + msg);
+            const detail = error.response?.data?.detail ? ` (${error.response.data.detail})` : '';
+            setError(msg + detail);
         } finally {
             setSaving(false);
         }
@@ -228,10 +236,18 @@ const UsersView = ({ branches: propBranches, profiles: propProfiles, onRefresh }
                                     required
                                     type="email"
                                     value={formData.email}
-                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                    onChange={e => {
+                                        setFormData({ ...formData, email: e.target.value });
+                                        if (error) setError(null);
+                                    }}
                                     className="premium-input bg-slate-50/50"
                                     placeholder="correo@ejemplo.com"
                                 />
+                                {error && (error.toLowerCase().includes('correo') || error.toLowerCase().includes('email')) && (
+                                    <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1 animate-pulse">
+                                        {error}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="space-y-2">
@@ -285,6 +301,13 @@ const UsersView = ({ branches: propBranches, profiles: propProfiles, onRefresh }
                                     </select>
                                 </div>
                             </div>
+
+                            {error && !(error.toLowerCase().includes('correo') || error.toLowerCase().includes('email')) && (
+                                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3">
+                                    <X className="text-rose-500" size={18} />
+                                    <p className="text-xs font-bold text-rose-600">{error}</p>
+                                </div>
+                            )}
 
                             <div className="pt-6 flex gap-3">
                                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-800 transition-colors">Cancelar</button>
