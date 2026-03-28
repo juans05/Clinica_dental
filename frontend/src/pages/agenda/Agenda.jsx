@@ -47,11 +47,17 @@ const Agenda = () => {
     });
     const [blockSaving, setBlockSaving] = useState(false);
 
+    const localDateStr = (d) => {
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
     const initialFormState = {
         date: '',
         time: '08:00',
         patientId: '',
         doctorId: '',
+        branchId: '',
         consultoryId: '',
         reason: 'Primera visita',
         urgency: 'NORMAL',
@@ -184,6 +190,11 @@ const Agenda = () => {
                 throw new Error("Fecha o hora inválida");
             }
 
+            const branchIdToSend = formData.branchId || selectedBranch;
+            if (!branchIdToSend) {
+                return alert('Debes seleccionar una sede para crear la cita.');
+            }
+
             await api.post('appointments', {
                 date: dateTime.toISOString(),
                 notes: formData.notes,
@@ -192,7 +203,8 @@ const Agenda = () => {
                 duration: parseInt(formData.duration),
                 patientId: formData.patientId,
                 doctorId: formData.doctorId || user.id,
-                consultoryId: formData.consultoryId
+                branchId: parseInt(branchIdToSend),
+                consultoryId: formData.consultoryId || undefined
             });
 
             setShowModal(false);
@@ -307,7 +319,7 @@ const Agenda = () => {
                     </button>
                     <button
                         onClick={() => {
-                            setFormData({ ...initialFormState, date: viewDate.toISOString().split('T')[0] });
+                            setFormData({ ...initialFormState, date: localDateStr(viewDate), branchId: selectedBranch || '' });
                             setShowModal(true);
                         }}
                         className="flex-1 md:flex-none premium-button-primary"
@@ -447,9 +459,8 @@ const Agenda = () => {
                                             <div
                                                 className="flex-1 p-2 relative cursor-cell"
                                                 onClick={() => {
-                                                    const dateStr = viewDate.toISOString().split('T')[0];
                                                     const timeStr = String(hour).padStart(2, '0') + ':00';
-                                                    setFormData({ ...initialFormState, date: dateStr, time: timeStr });
+                                                    setFormData({ ...initialFormState, date: localDateStr(viewDate), time: timeStr, branchId: selectedBranch || '' });
                                                     setShowModal(true);
                                                 }}
                                             >
@@ -689,6 +700,22 @@ const Agenda = () => {
                                     </div>
                                 </div>
 
+                                {/* Sede selector */}
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Sede Clínica *</label>
+                                    <select
+                                        value={formData.branchId}
+                                        onChange={e => setFormData({ ...formData, branchId: e.target.value })}
+                                        className="premium-input bg-slate-50/50"
+                                        required
+                                    >
+                                        <option value="">Seleccionar Sede...</option>
+                                        {branches.map(b => (
+                                            <option key={b.id} value={b.id}>{b.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
                                 {/* Doctor selector */}
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Especialista / Doctor</label>
@@ -715,10 +742,7 @@ const Agenda = () => {
                                     >
                                         <option value="">Seleccionar Sillón...</option>
                                         {consultories
-                                            .filter(c => {
-                                                const doc = doctors.find(d => d.id === formData.doctorId);
-                                                return !doc?.branchId || c.branchId === doc.branchId;
-                                            })
+                                            .filter(c => !formData.branchId || c.branchId === parseInt(formData.branchId))
                                             .map(c => (
                                                 <option key={c.id} value={c.id}>{c.name}</option>
                                             ))

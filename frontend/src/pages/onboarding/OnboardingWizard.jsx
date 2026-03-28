@@ -49,7 +49,29 @@ const Field = ({ label, icon: Icon, error, ...props }) => (
 const StepEmpresa = ({ onNext }) => {
     const [form, setForm] = useState({ commercialName: '', phone: '', address: '', receptionEmail: '' });
     const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(true);
     const [error, setError] = useState(null);
+
+    React.useEffect(() => {
+        const loadData = async () => {
+            try {
+                const { data } = await api.get('company');
+                if (data) {
+                    setForm({
+                        commercialName: data.commercialName || data.name || '',
+                        phone: data.phone || '',
+                        address: data.address || '',
+                        receptionEmail: data.receptionEmail || ''
+                    });
+                }
+            } catch (e) {
+                console.error('Error loading company data:', e);
+            } finally {
+                setFetching(false);
+            }
+        };
+        loadData();
+    }, []);
 
     const handleNext = async () => {
         setLoading(true);
@@ -65,6 +87,15 @@ const StepEmpresa = ({ onNext }) => {
     };
 
     const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+    if (fetching) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm font-bold text-slate-500">Cargando datos de tu clínica...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-5">

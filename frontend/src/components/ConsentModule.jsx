@@ -14,21 +14,38 @@ import jsPDF from 'jspdf';
 const cn = (...inputs) => twMerge(clsx(inputs));
 
 // ─── PDF Generator ─────────────────────────────────────────────────────────────
-const generateConsentPDF = (consent, patientName) => {
+const generateConsentPDF = (consent, patientName, template = null) => {
     const doc = new jsPDF();
     const pageW = doc.internal.pageSize.getWidth();
     const margin = 20;
     const maxW = pageW - margin * 2;
+    
+    // Support either a signed consent object or a raw template for preview
+    const title = consent?.template?.title || template?.title || 'Consentimiento';
+    const content = consent?.template?.content || template?.content || '';
+    const date = consent?.signedAt 
+        ? new Date(consent.signedAt).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })
+        : 'PENDIENTE DE FIRMA';
+    const isDraft = !consent?.signature;
 
     // Header
-    doc.setFillColor(14, 165, 233); // cyan-500
+    doc.setFillColor(isDraft ? 100 : 14, isDraft ? 116 : 165, isDraft ? 139 : 233); // slate-500 if draft, cyan-500 if signed
     doc.rect(0, 0, pageW, 40, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('CONSENTIMIENTO INFORMADO', pageW / 2, 18, { align: 'center' });
     doc.setFontSize(11);
-    doc.text(consent.template.title, pageW / 2, 30, { align: 'center' });
+    doc.text(title, pageW / 2, 30, { align: 'center' });
+
+    if (isDraft) {
+        doc.setFontSize(40);
+        doc.setTextColor(241, 245, 249); // slate-100
+        doc.saveGraphicsState();
+        doc.setCurrentTransformationMatrix(new doc.Matrix(1, -0.5, 0.5, 1, 0, 0));
+        doc.text('BORRADOR / PARA FIRMAR', pageW / 2 - 50, pageW / 2, { align: 'center', angle: 45 });
+        doc.restoreGraphicsState();
+    }
 
     // Patient info
     doc.setTextColor(30, 41, 59);
@@ -40,7 +57,7 @@ const generateConsentPDF = (consent, patientName) => {
     doc.setFont('helvetica', 'bold');
     doc.text('Fecha:', margin + 100, 55);
     doc.setFont('helvetica', 'normal');
-    doc.text(new Date(consent.signedAt).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' }), margin + 120, 55);
+    doc.text(date, margin + 120, 55);
 
     // Divider
     doc.setDrawColor(226, 232, 240);
@@ -50,10 +67,10 @@ const generateConsentPDF = (consent, patientName) => {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(51, 65, 85);
-    const lines = doc.splitTextToSize(consent.template.content || '', maxW);
+    const lines = doc.splitTextToSize(content, maxW);
     let y = 72;
     lines.forEach(line => {
-        if (y > 230) {
+        if (y > 270) {
             doc.addPage();
             y = 20;
         }
@@ -61,7 +78,7 @@ const generateConsentPDF = (consent, patientName) => {
         y += 6;
     });
 
-    // Signature
+    // Signature Area
     y = Math.max(y + 20, 200);
     if (y > 240) { doc.addPage(); y = 30; }
     doc.setDrawColor(226, 232, 240);
@@ -71,14 +88,18 @@ const generateConsentPDF = (consent, patientName) => {
     doc.setTextColor(100, 116, 139);
     doc.text('FIRMA DEL PACIENTE / REPRESENTANTE', margin, y);
 
-    if (consent.signature) {
+    if (consent?.signature) {
         try {
             doc.addImage(consent.signature, 'PNG', margin, y + 5, 80, 30);
+            doc.text(`Firmado digitalmente el ${new Date(consent.signedAt).toLocaleString('es-PE')}`, margin, y + 44);
         } catch (e) { /* skip */ }
+    } else {
+        doc.rect(margin, y + 5, 80, 40, 'S');
+        doc.text('ESPACIO PARA FIRMA MANUAl', margin + 5, y + 25);
     }
 
-    doc.text(`Firmado digitalmente el ${new Date(consent.signedAt).toLocaleString('es-PE')}`, margin, y + 44);
-    doc.save(`consentimiento_${consent.template.title.replace(/\s+/g, '_')}.pdf`);
+    const fileName = `consentimiento_${title.replace(/\s+/g, '_')}${isDraft ? '_borrador' : ''}.pdf`;
+    doc.save(fileName);
 };
 
 // ─── Consent Card ──────────────────────────────────────────────────────────────
@@ -193,7 +214,7 @@ const ConsentCard = ({ consent, patientName, onDelete }) => {
 };
 
 // ─── Signing Modal ─────────────────────────────────────────────────────────────
-const SigningModal = ({ template, patientId, onClose, onSigned }) => {
+const SigningModal = ({ template, patientId, patientName, onClose, onSigned }) => {
     const canvasRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [hasSignature, setHasSignature] = useState(false);
@@ -286,9 +307,18 @@ const SigningModal = ({ template, patientId, onClose, onSigned }) => {
                         <p className="text-[9px] font-black uppercase tracking-widest text-white/60 mb-1">Firmar Consentimiento</p>
                         <h3 className="font-black text-lg leading-tight max-w-md">{template.title}</h3>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-all">
-                        <X size={20} />
-                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => generateConsentPDF(null, patientName, template)}
+                            className="p-2 hover:bg-white/10 rounded-xl transition-all"
+                            title="Descargar para impresión"
+                        >
+                            <Download size={20} />
+                        </button>
+                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-all">
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="p-6 space-y-5">
@@ -565,6 +595,7 @@ const ConsentModule = ({ patientId, patientName = 'Paciente' }) => {
                     <SigningModal
                         template={signingTemplate}
                         patientId={patientId}
+                        patientName={patientName}
                         onClose={() => setSigningTemplate(null)}
                         onSigned={fetchData}
                     />

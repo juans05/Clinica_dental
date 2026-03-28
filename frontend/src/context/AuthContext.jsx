@@ -14,13 +14,24 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const checkUser = async () => {
-            const token = localStorage.getItem('token');
-            const storedUser = localStorage.getItem('user');
+            try {
+                const token = localStorage.getItem('token');
+                const storedUser = localStorage.getItem('user');
 
-            if (token && storedUser) {
-                setUser(JSON.parse(storedUser));
+                if (token && storedUser) {
+                    try {
+                        setUser(JSON.parse(storedUser));
+                    } catch (parseError) {
+                        console.error('Error parsing stored user:', parseError);
+                        localStorage.removeItem('user');
+                        localStorage.removeItem('token');
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking user session:', error);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         checkUser();
     }, []);
